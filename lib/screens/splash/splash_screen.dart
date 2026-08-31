@@ -23,12 +23,11 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _bootstrap() async {
     final auth = context.read<AuthProvider>();
-    await auth.restoreSession();
-
+    try {
+      await auth.restoreSession().timeout(const Duration(seconds: 5));
+    } catch (_) {}
     if (!mounted) return;
-
     final target = auth.isAuthenticated ? const HomeShell() : const LoginScreen();
-
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => target),
     );
@@ -49,10 +48,13 @@ class _SplashScreenState extends State<SplashScreen> {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(28),
               ),
-              child: const Icon(
-                Icons.delivery_dining,
-                size: 52,
-                color: AppTheme.primary,
+              padding: const EdgeInsets.all(12),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.asset(
+                  'images/logo.png',
+                  fit: BoxFit.contain,
+                ),
               ),
             ),
             const SizedBox(height: 24),

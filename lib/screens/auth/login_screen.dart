@@ -83,9 +83,9 @@ class _LoginScreenState extends State<LoginScreen> {
         await prefs.remove(_savedEmailKey);
       }
 
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeShell()),
-      );
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeShell()));
     } else {
       final error = auth.error;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -146,7 +146,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
+                            color: Colors.black.withValues(alpha: 0.04),
                             blurRadius: 16,
                             offset: const Offset(0, 4),
                           ),
@@ -187,7 +187,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             CustomTextField(
                               controller: _passwordController,
                               label: 'PASSWORD',
-                              hint: '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022',
+                              hint:
+                                  '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022',
                               icon: Icons.lock_outline,
                               obscure: _obscure,
                               focusNode: _passwordFocus,
@@ -223,8 +224,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                   height: 24,
                                   child: Checkbox(
                                     value: _rememberMe,
-                                    onChanged: (v) =>
-                                        setState(() => _rememberMe = v ?? false),
+                                    onChanged: (v) => setState(
+                                      () => _rememberMe = v ?? false,
+                                    ),
                                     activeColor: AppTheme.primary,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(4),
@@ -348,16 +350,13 @@ class _CurvedHeader extends StatelessWidget {
                     color: const Color(0xFF0F2942),
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.15),
+                      color: Colors.white.withValues(alpha: 0.15),
                       width: 1.5,
                     ),
                   ),
                   padding: const EdgeInsets.all(10),
                   child: ClipOval(
-                    child: Image.asset(
-                      'images/logo.png',
-                      fit: BoxFit.contain,
-                    ),
+                    child: Image.asset('images/logo.png', fit: BoxFit.contain),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -397,10 +396,7 @@ class _HeaderPainter extends CustomPainter {
     final gradient = LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
-      colors: [
-        AppTheme.primaryDark,
-        AppTheme.primary,
-      ],
+      colors: [AppTheme.primaryDark, AppTheme.primary],
     );
 
     final paint = Paint()

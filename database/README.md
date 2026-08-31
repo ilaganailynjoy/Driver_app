@@ -75,6 +75,12 @@ Desktop      ──local──>   PC (localhost:8000)      ──>  Laravel API 
 - `migrations`, `sessions`, `jobs`, `job_batches`, `failed_jobs`
 - `personal_access_tokens`, `password_reset_tokens`
 
+## Database Updates (Additive Only)
+
+> All changes are **additive only** — no DROP/RENAME/DELETE.  
+> See `updates/CHANGELOG.md` for what was added and how to verify in MySQL Workbench.  
+> Latest: `updates/2026_08_27_rider_app_integration.sql` (submitted_via column + 3 indexes, all verified on `invoizdb`).
+
 ## Schema Files
 
 - `schema.sql` - Full MySQL schema dump (no data, includes routines/triggers)

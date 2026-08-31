@@ -18,7 +18,8 @@ class ApiClient {
   /// Attach the bearer token to every request.
   void setToken(String? token) => _token = token;
 
-  static const Duration _timeout = Duration(seconds: 20);
+  static const Duration _timeout = Duration(seconds: 30);
+  static const Duration _uploadTimeout = Duration(seconds: 90);
 
   Uri _uri(String path, [Map<String, dynamic>? query]) {
     final base = AppConfig.apiBaseUrl;
@@ -86,10 +87,31 @@ class ApiClient {
     }
 
     final streamed = await _guard(() async {
-      final s = await _client.send(request).timeout(_timeout);
+      final s = await _client.send(request).timeout(_uploadTimeout);
       return http.Response.fromStream(s);
     });
 
+    return _decode(streamed);
+  }
+
+  /// Multipart with multiple files (rider application documents).
+  Future<dynamic> postMultipartMany(
+    String path, {
+    required Map<String, ({Uint8List bytes, String filename})> files,
+    Map<String, String>? fields,
+  }) async {
+    final request = http.MultipartRequest('POST', _uri(path));
+    request.headers.addAll(_headers(json: false));
+    files.forEach((field, data) {
+      request.files.add(http.MultipartFile.fromBytes(field, data.bytes, filename: data.filename));
+    });
+    if (fields != null) {
+      fields.forEach((k, v) => request.fields.putIfAbsent(k, () => v));
+    }
+    final streamed = await _guard(() async {
+      final s = await _client.send(request).timeout(_uploadTimeout);
+      return http.Response.fromStream(s);
+    });
     return _decode(streamed);
   }
 

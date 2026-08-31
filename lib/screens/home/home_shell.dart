@@ -1,14 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/delivery_provider.dart';
 import '../../providers/earnings_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/rider_provider.dart';
+import '../../services/location_service.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../deliveries/deliveries_screen.dart';
-import '../earnings/earnings_screen.dart';
+import '../messages/messages_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
 
@@ -22,12 +26,12 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+  Timer? _locationTimer;
 
   static const _screens = [
     DashboardScreen(),
     DeliveriesScreen(),
-    EarningsScreen(),
-    NotificationsScreen(),
+    MessagesScreen(),
     ProfileScreen(),
   ];
 
@@ -35,6 +39,7 @@ class _HomeShellState extends State<HomeShell> {
   void initState() {
     super.initState();
     _preload();
+    _startLocationHeartbeat();
   }
 
   void _preload() {
@@ -48,15 +53,60 @@ class _HomeShellState extends State<HomeShell> {
     });
   }
 
+  void _startLocationHeartbeat() {
+    _locationTimer?.cancel();
+    _locationTimer = Timer.periodic(const Duration(seconds: AppConstants.locationUpdateInterval), (_) async {
+      if (!mounted) return;
+      final rider = context.read<RiderProvider>();
+      if (!rider.isOnline) return;
+      try {
+        final auth = context.read<AuthProvider>();
+        final svc = LocationService(auth.api);
+        int? deliveryId;
+        try {
+          deliveryId = context.read<DeliveryProvider>().selected?.id;
+        } catch (_) {}
+        await svc.report(deliveryId: deliveryId);
+      } catch (_) {}
+    });
+  }
+
+  @override
+  void dispose() {
+    _locationTimer?.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Invoiz Rider'),
+        actions: [
+          Consumer<NotificationProvider>(
+            builder: (_, p, _) => Stack(
+              children: [
+                IconButton(icon: const Icon(Icons.notifications_outlined), onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotificationsScreen()))),
+                if (p.unread > 0)
+                  Positioned(
+                    right: 6,
+                    top: 6,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                      child: Text('${p.unread}', style: const TextStyle(color: Colors.white, fontSize: 10)),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
       body: IndexedStack(index: _index, children: _screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) {
           if (i == 1) context.read<DeliveryProvider>().load();
-          if (i == 3) context.read<NotificationProvider>().load();
           setState(() => _index = i);
         },
         destinations: const [
@@ -71,14 +121,9 @@ class _HomeShellState extends State<HomeShell> {
             label: 'Deliveries',
           ),
           NavigationDestination(
-            icon: Icon(Icons.account_balance_wallet_outlined),
-            selectedIcon: Icon(Icons.account_balance_wallet),
-            label: 'Earnings',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.notifications_outlined),
-            selectedIcon: Icon(Icons.notifications),
-            label: 'Alerts',
+            icon: Icon(Icons.chat_bubble_outline),
+            selectedIcon: Icon(Icons.chat_bubble),
+            label: 'Messages',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
