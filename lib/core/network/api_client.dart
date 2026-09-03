@@ -24,7 +24,29 @@ class ApiClient {
   Uri _uri(String path, [Map<String, dynamic>? query]) {
     final base = AppConfig.apiBaseUrl;
     final clean = path.startsWith('/') ? path : '/$path';
-    return Uri.parse('$base$clean').replace(queryParameters: query);
+    return Uri.parse('$base$clean')
+        .replace(queryParameters: _stringifyQuery(query));
+  }
+
+  /// `Uri.queryParameters` only accepts `String` / `Iterable<String>` values.
+  /// Callers pass ints (e.g. `page: 1`) and nulls (absent optional filters);
+  /// forwarding those raw makes `Uri.replace` throw
+  /// `type 'int' is not a subtype of type 'Iterable<dynamic>'` before any
+  /// HTTP request is sent (this broke the Deliveries list).
+  static Map<String, dynamic>? _stringifyQuery(Map<String, dynamic>? query) {
+    if (query == null) return null;
+    final out = <String, dynamic>{};
+    query.forEach((key, value) {
+      if (value == null) return; // drop absent optional filters
+      if (value is String) {
+        out[key] = value;
+      } else if (value is Iterable) {
+        out[key] = value.map((e) => e.toString()).toList();
+      } else {
+        out[key] = value.toString();
+      }
+    });
+    return out;
   }
 
   Map<String, String> _headers({bool json = true}) {
