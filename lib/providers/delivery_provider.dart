@@ -50,8 +50,13 @@ class DeliveryProvider extends ChangeNotifier {
       _deliveries = page.deliveries;
     } on ApiException catch (e) {
       _error = e.message;
-    } catch (_) {
-      _error = 'Unable to load deliveries. Please try again.';
+    } catch (e) {
+      // Don't mask the underlying failure with a static string: expose the
+      // real exception so a network/parse/type error is diagnosable.
+      final detail = e.toString();
+      _error = (detail.isNotEmpty && detail != 'Exception')
+          ? 'Unable to load deliveries ($detail).'
+          : 'Unable to load deliveries. Please try again.';
     } finally {
       _loading = false;
       notifyListeners();

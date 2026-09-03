@@ -10,6 +10,7 @@ import '../../providers/earnings_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/rider_provider.dart';
 import '../../services/location_service.dart';
+import '../auth/login_screen.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../deliveries/deliveries_screen.dart';
 import '../messages/messages_screen.dart';
@@ -40,6 +41,30 @@ class _HomeShellState extends State<HomeShell> {
     super.initState();
     _preload();
     _startLocationHeartbeat();
+    _redirectOnLogout();
+  }
+
+  void _redirectOnLogout() {
+    context.read<AuthProvider>().addListener(_onAuthChanged);
+  }
+
+  void _onAuthChanged() {
+    final auth = context.read<AuthProvider>();
+    if (auth.status == AuthStatus.unauthenticated && mounted) {
+      Navigator.of(
+        context,
+      ).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    context.read<AuthProvider>().removeListener(_onAuthChanged);
+    _locationTimer?.cancel();
+    super.dispose();
   }
 
   void _preload() {
@@ -69,12 +94,6 @@ class _HomeShellState extends State<HomeShell> {
         await svc.report(deliveryId: deliveryId);
       } catch (_) {}
     });
-  }
-
-  @override
-  void dispose() {
-    _locationTimer?.cancel();
-    super.dispose();
   }
 
   @override

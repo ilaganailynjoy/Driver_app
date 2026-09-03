@@ -70,6 +70,26 @@ class _ApplicationStatusScreenState extends State<ApplicationStatusScreen> {
               const SizedBox(height: 16),
               Center(child: _badge(_app!.status)),
               const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.confirmation_number_outlined, size: 18, color: Color(0xFF64748B)),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Reference: ${_app!.referenceNumber}',
+                      style: const TextStyle(fontWeight: FontWeight.w700, letterSpacing: 0.5),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
               _card(),
             ],
           ]),
@@ -95,6 +115,12 @@ class _ApplicationStatusScreenState extends State<ApplicationStatusScreen> {
         Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
         const SizedBox(height: 8),
         Text(desc, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF6B7280))),
+        const SizedBox(height: 12),
+        if (a.riderType != null || a.vehicleOwnership != null)
+          Text(
+            '${a.riderType != null ? a.riderType!.replaceAll('_', ' ').toUpperCase() : ''}${a.riderType != null && a.vehicleOwnership != null ? ' · ' : ''}${a.vehicleOwnership != null ? a.vehicleOwnership!.replaceAll('_', ' ').toUpperCase() : ''}',
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF6B7280)),
+          ),
         const SizedBox(height: 12),
         Text('Applied: ${a.createdAt ?? "-"}', style: const TextStyle(fontSize: 12, color: Color(0xFF9AA3AF))),
         if (a.reviewedAt != null) Text('Reviewed: ${a.reviewedAt}', style: const TextStyle(fontSize: 12, color: Color(0xFF9AA3AF))),

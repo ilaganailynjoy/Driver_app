@@ -30,6 +30,10 @@ class ApiClient {
   Map<String, String> _headers({bool json = true}) {
     final headers = <String, String>{
       if (json) 'Accept': 'application/json',
+      // Declare JSON so Laravel parses the JSON-encoded body into request
+      // input. Without this, package:http defaults to text/plain and
+      // $request->validate() sees no fields (e.g. "email field is required").
+      if (json) 'Content-Type': 'application/json',
       if (_token != null && _token!.isNotEmpty)
         'Authorization': 'Bearer $_token',
     };

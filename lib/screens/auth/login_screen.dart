@@ -4,6 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
+import '../apply/apply_screen.dart';
+import '../apply/application_status_screen.dart';
 import '../home/home_shell.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/primary_button.dart';
@@ -254,6 +256,52 @@ class _LoginScreenState extends State<LoginScreen> {
                           ],
                         ),
                       ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // ── Apply as a rider / check status ──
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const ApplyScreen(),
+                              ),
+                            ),
+                            icon: const Icon(Icons.person_add_outlined, size: 18),
+                            label: const Text('Apply as a Rider'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppTheme.primary,
+                              minimumSize: const Size.fromHeight(48),
+                              side: const BorderSide(color: AppTheme.primary),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const ApplicationStatusScreen(),
+                              ),
+                            ),
+                            icon: const Icon(Icons.manage_search_outlined, size: 18),
+                            label: const Text('Check Status'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppTheme.primary,
+                              minimumSize: const Size.fromHeight(48),
+                              side: const BorderSide(color: AppTheme.primary),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 24),
 

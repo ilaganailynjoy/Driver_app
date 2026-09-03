@@ -55,12 +55,49 @@ class MessageAttachment {
       );
 }
 
+class ConversationHeader {
+  const ConversationHeader({
+    required this.id,
+    this.subject,
+    this.recipientName,
+    this.recipientType,
+    this.recipientLabel,
+    this.tracking,
+  });
+
+  final int id;
+  final String? subject;
+  final String? recipientName;
+  final String? recipientType;
+  final String? recipientLabel;
+  final String? tracking;
+
+  factory ConversationHeader.fromJson(Map<String, dynamic> j) =>
+      ConversationHeader(
+        id: (j['id'] as num?)?.toInt() ?? 0,
+        subject: j['subject'] as String?,
+        recipientName: j['recipient_name'] as String?,
+        recipientType: j['recipient_type'] as String?,
+        recipientLabel: j['recipient_label'] as String?,
+        tracking: j['tracking'] as String?,
+      );
+
+  /// Name shown in the header (who the rider is messaging).
+  String get displayName => recipientName ?? 'Logistics';
+}
+
 class MessageService {
   MessageService(this._api);
   final ApiClient _api;
+  ConversationHeader? conversation;
 
   Future<List<RiderMessage>> getMessages() async {
     final data = await _api.get('/rider/messages');
+    if (data['conversation'] is Map<String, dynamic>) {
+      conversation = ConversationHeader.fromJson(
+        Map<String, dynamic>.from(data['conversation'] as Map),
+      );
+    }
     final list = data['messages'] as List? ?? [];
     return list.whereType<Map<String, dynamic>>().map(RiderMessage.fromJson).toList();
   }

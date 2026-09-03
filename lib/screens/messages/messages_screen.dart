@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/network/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/message_service.dart';
@@ -20,6 +19,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
   final _input = TextEditingController();
   final _scroll = ScrollController();
   List<RiderMessage> _messages = [];
+  ConversationHeader? _header;
   bool _loading = true;
   bool _sending = false;
   Timer? _poll;
@@ -33,9 +33,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
 
   MessageService _svc() {
     final auth = context.read<AuthProvider>();
-    final api = ApiClient();
-    api.setToken(auth.api.toString().isEmpty ? null : null);
-    // Use auth's api which already has token set
+    // Reuse the auth provider's ApiClient so the bearer token is attached.
     return MessageService(auth.api);
   }
 
@@ -44,7 +42,13 @@ class _MessagesScreenState extends State<MessagesScreen> {
     try {
       final svc = _svc();
       final list = await svc.getMessages();
-      if (mounted) setState(() { _messages = list; _loading = false; });
+      if (mounted) {
+        setState(() {
+          _header = svc.conversation;
+          _messages = list;
+          _loading = false;
+        });
+      }
       _jump();
     } catch (_) {
       if (mounted) setState(() => _loading = false);
@@ -104,7 +108,23 @@ class _MessagesScreenState extends State<MessagesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Messages'), centerTitle: true),
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(_header?.displayName ?? 'Messages',
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            if (_header != null)
+              Text(
+                _header!.tracking != null
+                    ? '${_header!.recipientLabel ?? 'Support'} · ${_header!.tracking}'
+                    : (_header!.recipientLabel ?? 'Support'),
+                style: const TextStyle(fontSize: 12, color: Color(0xFF9AA3AF)),
+              ),
+          ],
+        ),
+        centerTitle: false,
+      ),
       body: Column(children: [
         Expanded(
           child: _loading
