@@ -130,7 +130,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         children: const [
           SizedBox(height: 100),
-          Icon(Icons.history, size: 56, color: Color(0xFF9AA3AF)),
+          Icon(Icons.history, size: 56, color: AppColors.textSecondary),
           SizedBox(height: 16),
           Text(
             'No delivery history',
@@ -171,7 +171,7 @@ class _FilterChip extends StatelessWidget {
       onSelected: (_) => onPressed(),
       selectedColor: AppTheme.primary,
       labelStyle: TextStyle(
-        color: selected ? Colors.white : const Color(0xFF4B5563),
+        color: selected ? Colors.white : AppColors.textSecondary,
         fontWeight: FontWeight.w600,
       ),
     );
@@ -186,7 +186,7 @@ class _HistoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDelivered = entry.status == 'delivered';
-    final color = isDelivered ? const Color(0xFF2A9D8F) : const Color(0xFFE63946);
+    final color = isDelivered ? AppColors.success : AppColors.warning;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -224,11 +224,11 @@ class _HistoryCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text('${entry.shopName} → ${entry.customerName}',
-                style: const TextStyle(fontSize: 13, color: Color(0xFF4B5563))),
+                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
             const SizedBox(height: 4),
             Text(
               FormatUtils.dateTime(entry.deliveredAt),
-              style: const TextStyle(fontSize: 12, color: Color(0xFF9AA3AF)),
+              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 10),
             Row(
@@ -237,7 +237,7 @@ class _HistoryCard extends StatelessWidget {
                 Text(
                   _paymentLabel(entry.paymentMethod),
                   style: const TextStyle(
-                      fontSize: 12, color: Color(0xFF6B7280)),
+                      fontSize: 12, color: AppColors.textSecondary),
                 ),
                 if (entry.earned != null)
                   Text(

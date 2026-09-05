@@ -103,7 +103,7 @@ class _PickupScreenState extends State<PickupScreen> {
                   const Text(
                     'Order',
                     style: TextStyle(
-                        fontSize: 13, color: Color(0xFF6B7280)),
+                        fontSize: 13, color: AppColors.textSecondary),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -115,7 +115,7 @@ class _PickupScreenState extends State<PickupScreen> {
                   Text(
                     delivery.shop.name,
                     style: const TextStyle(
-                        fontSize: 14, color: Color(0xFF4B5563)),
+                        fontSize: 14, color: AppColors.textSecondary),
                   ),
                 ],
               ),
@@ -135,7 +135,7 @@ class _PickupScreenState extends State<PickupScreen> {
                     ? const [
                         Text(
                           'No items listed.',
-                          style: TextStyle(color: Color(0xFF6B7280)),
+                          style: TextStyle(color: AppColors.textSecondary),
                         ),
                       ]
                     : delivery.items
@@ -175,7 +175,7 @@ class _PickupScreenState extends State<PickupScreen> {
             const SizedBox(height: 4),
             const Text(
               'Enter the pickup PIN provided by the shop.',
-              style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 12),
             TextField(

@@ -97,6 +97,56 @@ class _MessagesScreenState extends State<MessagesScreen> {
     await _send(bytes: bytes, name: file.name);
   }
 
+  void _viewAttachment(MessageAttachment a) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: GestureDetector(
+          onTap: () => Navigator.of(ctx).pop(),
+          child: InteractiveViewer(
+            child: Image.network(
+              a.url,
+              fit: BoxFit.contain,
+              loadingBuilder: (_, child, progress) =>
+                  progress == null ? child : const Center(child: CircularProgressIndicator()),
+              errorBuilder: (_, _, _) => const Center(
+                child: Text('Unable to load attachment',
+                    style: TextStyle(color: Colors.white)),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _attachmentTile(MessageAttachment a, bool mine) {
+    final isImage = a.isImage && a.url.isNotEmpty;
+    final linkStyle = TextStyle(
+      fontSize: 12,
+      color: mine ? Colors.white70 : AppTheme.primary,
+    );
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: isImage
+          ? GestureDetector(
+              onTap: () => _viewAttachment(a),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.network(
+                  a.url,
+                  width: 180,
+                  height: 140,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Text('📎 ${a.name} (${a.size})', style: linkStyle),
+                ),
+              ),
+            )
+          : Text('📎 ${a.name} (${a.size})', style: linkStyle),
+    );
+  }
+
   @override
   void dispose() {
     _poll?.cancel();
@@ -119,7 +169,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                 _header!.tracking != null
                     ? '${_header!.recipientLabel ?? 'Support'} · ${_header!.tracking}'
                     : (_header!.recipientLabel ?? 'Support'),
-                style: const TextStyle(fontSize: 12, color: Color(0xFF9AA3AF)),
+                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
           ],
         ),
@@ -139,7 +189,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                         final m = _messages[i];
                         final showDay = i == 0 || _messages[i - 1].dayLabel != m.dayLabel;
                         return Column(children: [
-                          if (showDay) Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(m.dayLabel, style: const TextStyle(fontSize: 12, color: Color(0xFF9AA3AF)))),
+                          if (showDay) Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(m.dayLabel, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
                           Align(
                             alignment: m.mine ? Alignment.centerRight : Alignment.centerLeft,
                             child: Container(
@@ -149,14 +199,14 @@ class _MessagesScreenState extends State<MessagesScreen> {
                               decoration: BoxDecoration(
                                 color: m.mine ? AppTheme.primary : Colors.white,
                                 borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: m.mine ? AppTheme.primary : const Color(0xFFE6E9EF)),
+                                border: Border.all(color: m.mine ? AppTheme.primary : AppColors.border),
                               ),
                               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                if (m.deleted) const Text('This message was deleted', style: TextStyle(fontStyle: FontStyle.italic, color: Color(0xFF9AA3AF))),
-                                if (!m.deleted) Text(m.body, style: TextStyle(color: m.mine ? Colors.white : const Color(0xFF1B1F24))),
-                                if (m.attachments.isNotEmpty) ...m.attachments.map((a) => Padding(padding: const EdgeInsets.only(top: 6), child: Text('📎 ${a.name} (${a.size})', style: TextStyle(fontSize: 12, color: m.mine ? Colors.white70 : AppTheme.primary)))),
+                                if (m.deleted) const Text('This message was deleted', style: TextStyle(fontStyle: FontStyle.italic, color: AppColors.textSecondary)),
+                                if (!m.deleted) Text(m.body, style: TextStyle(color: m.mine ? Colors.white : AppColors.textPrimary)),
+                                if (m.attachments.isNotEmpty) ...m.attachments.map((a) => _attachmentTile(a, m.mine)),
                                 const SizedBox(height: 4),
-                                Text(m.time, style: TextStyle(fontSize: 10, color: m.mine ? Colors.white70 : const Color(0xFF9AA3AF))),
+                                Text(m.time, style: TextStyle(fontSize: 10, color: m.mine ? Colors.white70 : AppColors.textSecondary)),
                               ]),
                             ),
                           ),
@@ -166,7 +216,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
         ),
         Container(
           padding: const EdgeInsets.all(12),
-          decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Color(0xFFE6E9EF)))),
+          decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: AppColors.border))),
           child: Row(children: [
             IconButton(onPressed: _sending ? null : _pickAttachment, icon: const Icon(Icons.attach_file_outlined)),
             Expanded(child: TextField(controller: _input, decoration: InputDecoration(hintText: 'Type a message...', border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)), contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10)), onSubmitted: (_) => _send())),

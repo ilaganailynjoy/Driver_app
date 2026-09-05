@@ -89,7 +89,7 @@ class DashboardScreen extends StatelessWidget {
                 label: 'To Pick Up',
                 value: '${dashboard?.stats['to_pick_up'] ?? 0}',
                 icon: Icons.storefront_outlined,
-                color: const Color(0xFFF29900),
+                color: AppColors.secondary,
                 onTap: () => _goToFiltered(context, 'pickup'),
               ),
             ),
@@ -113,7 +113,7 @@ class DashboardScreen extends StatelessWidget {
                 label: 'Completed',
                 value: '${dashboard?.stats['completed'] ?? 0}',
                 icon: Icons.check_circle_outline,
-                color: const Color(0xFF2A9D8F),
+                color: AppColors.success,
                 onTap: () => _goToFiltered(context, 'delivered'),
               ),
             ),
@@ -131,7 +131,7 @@ class DashboardScreen extends StatelessWidget {
           DeliveryCard(
             delivery: dashboard!.currentDelivery!,
             onTap: () => _openDelivery(context, dashboard.currentDelivery!),
-            trailing: const Icon(Icons.chevron_right, color: Color(0xFF9AA3AF)),
+            trailing: const Icon(Icons.chevron_right, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 8),
         ],
@@ -144,7 +144,7 @@ class DashboardScreen extends StatelessWidget {
           DeliveryCard(
             delivery: dashboard!.upcomingPickup!,
             onTap: () => _openDelivery(context, dashboard.upcomingPickup!),
-            trailing: const Icon(Icons.chevron_right, color: Color(0xFF9AA3AF)),
+            trailing: const Icon(Icons.chevron_right, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 8),
         ],
@@ -159,7 +159,7 @@ class DashboardScreen extends StatelessWidget {
                   delivery: d,
                   onTap: () => _openDelivery(context, d),
                   trailing: const Icon(Icons.chevron_right,
-                      color: Color(0xFF9AA3AF)),
+                      color: AppColors.textSecondary),
                 ),
               ),
         ],
@@ -209,42 +209,61 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const CircleAvatar(
-          radius: 26,
-          backgroundColor: AppTheme.primary,
-          child: Icon(Icons.person, color: Colors.white, size: 30),
+        Row(
+          children: [
+            const CircleAvatar(
+              radius: 26,
+              backgroundColor: AppTheme.primary,
+              child: Icon(Icons.person, color: Colors.white, size: 30),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Hello, $name!',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    isOnline ? 'You are ONLINE' : 'You are OFFLINE',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color:
+                          isOnline ? AppTheme.success : AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Switch(
+              value: isOnline,
+              onChanged: busy ? null : (_) => onToggle(),
+              activeThumbColor: Colors.white,
+              activeTrackColor: AppTheme.success,
+            ),
+          ],
         ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Hello, $name!',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                isOnline ? 'You are ONLINE' : 'You are OFFLINE',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: isOnline ? AppTheme.success : const Color(0xFF6B7280),
-                ),
-              ),
-            ],
+        const SizedBox(height: 6),
+        Padding(
+          padding: const EdgeInsets.only(left: 2),
+          child: Text(
+            isOnline
+                ? 'Available for new assignments'
+                : 'Not taking new assignments — you can still finish current deliveries',
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
           ),
-        ),
-        Switch(
-          value: isOnline,
-          onChanged: busy ? null : (_) => onToggle(),
-          activeThumbColor: Colors.white,
-          activeTrackColor: AppTheme.success,
         ),
       ],
     );

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/theme/app_theme.dart';
+
 /// Colored status badge for delivery statuses.
 class StatusBadge extends StatelessWidget {
   const StatusBadge({super.key, required this.status, this.label});
@@ -16,23 +18,23 @@ class StatusBadge extends StatelessWidget {
       case 'going_to_pickup':
       case 'arrived_at_shop':
       case 'pickup':
-        return const Color(0xFFF29900);
+        return AppColors.secondary;
       case 'picked_up':
       case 'out_for_delivery':
       case 'arrived_at_customer':
       case 'in_transit':
         return const Color(0xFF8A4BDF);
       case 'delivered':
-        return const Color(0xFF2A9D8F);
+        return AppColors.success;
       case 'delivery_failed':
       case 'failed':
-        return const Color(0xFFE63946);
+        return AppColors.warning;
       case 'cancelled':
-        return const Color(0xFF6B7280);
+        return AppColors.textSecondary;
       case 'waiting_for_rider':
-        return const Color(0xFF6B7280);
+        return AppColors.textSecondary;
       default:
-        return const Color(0xFF6B7280);
+        return AppColors.textSecondary;
     }
   }
 

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/delivery_provider.dart';
 import '../../providers/earnings_provider.dart';
@@ -112,7 +113,7 @@ class _HomeShellState extends State<HomeShell> {
                     top: 6,
                     child: Container(
                       padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                      decoration: const BoxDecoration(color: AppColors.warning, shape: BoxShape.circle),
                       child: Text('${p.unread}', style: const TextStyle(color: Colors.white, fontSize: 10)),
                     ),
                   ),

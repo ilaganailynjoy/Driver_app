@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/vehicle_icons.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/rider_provider.dart';
 import '../../widgets/error_widget.dart';
 import '../../widgets/loading_widget.dart';
+import 'change_password_screen.dart';
 
 /// Rider profile: account info, stats, edit + logout.
 class ProfileScreen extends StatelessWidget {
@@ -86,7 +88,7 @@ class ProfileScreen extends StatelessWidget {
                 Text(
                   email,
                   style: const TextStyle(
-                      fontSize: 14, color: Color(0xFF6B7280)),
+                      fontSize: 14, color: AppColors.textSecondary),
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -97,7 +99,7 @@ class ProfileScreen extends StatelessWidget {
                       size: 10,
                       color: isOnline
                           ? AppTheme.success
-                          : const Color(0xFF9AA3AF),
+                          : AppColors.textSecondary,
                     ),
                     const SizedBox(width: 6),
                     Text(
@@ -107,7 +109,7 @@ class ProfileScreen extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                         color: isOnline
                             ? AppTheme.success
-                            : const Color(0xFF6B7280),
+                            : AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -127,7 +129,7 @@ class ProfileScreen extends StatelessWidget {
               ),
               const Divider(height: 1, indent: 56),
               _InfoRow(
-                icon: Icons.directions_bike_outlined,
+                icon: vehicleIconFor(vehicleType),
                 label: 'Vehicle',
                 value: vehicleType ?? '—',
               ),
@@ -138,6 +140,53 @@ class ProfileScreen extends StatelessWidget {
                 value: licensePlate ?? '—',
               ),
             ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Account & Security',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 10),
+        Card(
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const ChangePasswordScreen(),
+              ),
+            ),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Icon(Icons.lock_outline,
+                      size: 20, color: AppColors.textSecondary),
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Change Password',
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w600),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Update your login password',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right,
+                      color: AppColors.textSecondary),
+                ],
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 16),
@@ -197,7 +246,22 @@ class ProfileScreen extends StatelessWidget {
                   : Icons.play_circle_outline),
           label: Text(isOnline ? 'Go Offline' : 'Go Online'),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Text(
+            isOnline
+                ? 'You are available for new assignments. Going offline stops new deliveries from being assigned to you.'
+                : 'Offline means you will not receive new assignments, but you can still complete your current deliveries.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 12.5,
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
         ElevatedButton.icon(
           onPressed: () => _confirmLogout(context, auth),
           style: ElevatedButton.styleFrom(
@@ -266,11 +330,11 @@ class _InfoRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: const Color(0xFF6B7280)),
+          Icon(icon, size: 20, color: AppColors.textSecondary),
           const SizedBox(width: 16),
           Text(
             label,
-            style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
+            style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
           ),
           const Spacer(),
           Text(
@@ -312,7 +376,7 @@ class _StatCard extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               label,
-              style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -410,9 +474,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
             initialValue: _vehicle,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Vehicle Type',
-              prefixIcon: Icon(Icons.directions_bike_outlined),
+              prefixIcon: Icon(vehicleIconFor(_vehicle)),
             ),
             items: _vehicles
                 .map((v) => DropdownMenuItem(value: v, child: Text(v)))

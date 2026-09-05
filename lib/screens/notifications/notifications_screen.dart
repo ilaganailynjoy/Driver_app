@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/theme/app_theme.dart';
 import '../../core/utils/format_utils.dart';
 import '../../models/rider_notification.dart';
 import '../../providers/notification_provider.dart';
@@ -47,7 +48,7 @@ class NotificationsScreen extends StatelessWidget {
         physics: const AlwaysScrollableScrollPhysics(),
         children: const [
           SizedBox(height: 100),
-          Icon(Icons.notifications_none, size: 56, color: Color(0xFF9AA3AF)),
+          Icon(Icons.notifications_none, size: 56, color: AppColors.textSecondary),
           SizedBox(height: 16),
           Text(
             'No notifications yet',
@@ -107,16 +108,16 @@ class _NotificationTile extends StatelessWidget {
                 height: 42,
                 decoration: BoxDecoration(
                   color: isRead
-                      ? const Color(0xFFE6E9EF)
-                      : const Color(0xFF1E6F5C).withValues(alpha: 0.12),
+                      ? AppColors.border
+                      : AppColors.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   icon,
                   size: 20,
                   color: isRead
-                      ? const Color(0xFF9AA3AF)
-                      : const Color(0xFF1E6F5C),
+                      ? AppColors.textSecondary
+                      : AppColors.primary,
                 ),
               ),
               const SizedBox(width: 12),
@@ -138,7 +139,7 @@ class _NotificationTile extends StatelessWidget {
                         body,
                         style: const TextStyle(
                           fontSize: 13,
-                          color: Color(0xFF4B5563),
+                          color: AppColors.textSecondary,
                           height: 1.35,
                         ),
                       ),
@@ -147,7 +148,7 @@ class _NotificationTile extends StatelessWidget {
                     Text(
                       FormatUtils.timeAgo(createdAt),
                       style: const TextStyle(
-                          fontSize: 11, color: Color(0xFF9AA3AF)),
+                          fontSize: 11, color: AppColors.textSecondary),
                     ),
                   ],
                 ),
@@ -158,7 +159,7 @@ class _NotificationTile extends StatelessWidget {
                   height: 8,
                   margin: const EdgeInsets.only(top: 6),
                   decoration: const BoxDecoration(
-                    color: Color(0xFF1E6F5C),
+                    color: AppColors.primary,
                     shape: BoxShape.circle,
                   ),
                 ),

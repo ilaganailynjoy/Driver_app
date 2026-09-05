@@ -128,6 +128,39 @@ class RiderProvider extends ChangeNotifier {
     }
   }
 
+  /// Change the rider's password. Returns `true` on success and exposes
+  /// the backend message in [error] on failure.
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    _statusBusy = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _service.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+        confirmPassword: confirmPassword,
+      );
+      _statusBusy = false;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      _statusBusy = false;
+      notifyListeners();
+      return false;
+    } catch (_) {
+      _error = 'Unable to change password. Please try again.';
+      _statusBusy = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   /// Called by the delivery provider when a delivery's status changes.
   void refreshDeliveryStatus(Delivery delivery) {
     if (_dashboard != null) {

@@ -18,12 +18,14 @@ class AppConfig {
   );
 
   /// LAN IP of this PC — used by physical phones connected via USB or Wi-Fi.
-  static const String lanHost = 'http://192.168.1.22:8000/api';
+  /// If the PC gets a different DHCP address, update this (or pass
+  /// `API_BASE_URL` via dart-define at build time).
+  static const String lanHost = 'http://192.168.1.17:8000/api';
 
   /// Base URL used while running locally (override via dart-define).
   static const String devHost = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://192.168.1.22:8000/api',
+    defaultValue: 'http://192.168.1.17:8000/api',
   );
 
   /// Base URL for a production Laravel deployment.

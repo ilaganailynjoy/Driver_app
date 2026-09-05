@@ -172,7 +172,7 @@ class _ProofOfDeliveryScreenState extends State<ProofOfDeliveryScreen> {
                         style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w800,
-                          color: AppTheme.accent,
+                            color: AppTheme.secondary,
                         ),
                       ),
                     ],
@@ -309,7 +309,7 @@ class _ChangeRow extends StatelessWidget {
       children: [
         const Text(
           'Change',
-          style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
+          style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
         ),
         Text(
           FormatUtils.peso(change),

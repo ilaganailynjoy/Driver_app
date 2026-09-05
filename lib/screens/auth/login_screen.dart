@@ -101,7 +101,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final screenHeight = MediaQuery.of(context).size.height;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F8),
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: SingleChildScrollView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -113,7 +113,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
               // ── Login intro ──
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -122,7 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: TextStyle(
                         fontSize: 26,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF1B1F24),
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -130,7 +130,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       'Sign in with your approved Invoiz rider account.',
                       style: TextStyle(
                         fontSize: 14,
-                        color: Color(0xFF6B7280),
+                        color: AppColors.textSecondary,
                         height: 1.5,
                       ),
                     ),
@@ -141,11 +141,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: const Color(0xFFE6E9EF),
-                          width: 1,
-                        ),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: AppColors.border, width: 1),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.04),
@@ -163,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             CustomTextField(
                               controller: _emailController,
                               label: 'EMAIL ADDRESS',
-                              hint: 'rider@invoiz.test',
+                              hint: 'you@example.com',
                               icon: Icons.email_outlined,
                               keyboardType: TextInputType.emailAddress,
                               focusNode: _emailFocus,
@@ -196,10 +193,12 @@ class _LoginScreenState extends State<LoginScreen> {
                               focusNode: _passwordFocus,
                               suffix: IconButton(
                                 icon: Icon(
+                                  // Icon always mirrors the current state:
+                                  // slashed eye = hidden, open eye = visible.
                                   _obscure
-                                      ? Icons.visibility_outlined
-                                      : Icons.visibility_off_outlined,
-                                  color: const Color(0xFF9AA3AF),
+                                      ? Icons.visibility_off_outlined
+                                      : Icons.visibility_outlined,
+                                  color: AppColors.textSecondary,
                                   size: 20,
                                 ),
                                 onPressed: () =>
@@ -240,7 +239,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   'Remember me',
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: Color(0xFF6B7280),
+                                    color: AppColors.textSecondary,
                                   ),
                                 ),
                               ],
@@ -269,7 +268,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                 builder: (_) => const ApplyScreen(),
                               ),
                             ),
-                            icon: const Icon(Icons.person_add_outlined, size: 18),
+                            icon: const Icon(
+                              Icons.person_add_outlined,
+                              size: 18,
+                            ),
                             label: const Text('Apply as a Rider'),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppTheme.primary,
@@ -289,8 +291,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                 builder: (_) => const ApplicationStatusScreen(),
                               ),
                             ),
-                            icon: const Icon(Icons.manage_search_outlined, size: 18),
-                            label: const Text('Check Status'),
+                            icon: const Icon(
+                              Icons.manage_search_outlined,
+                              size: 18,
+                            ),
+                            label: const Text('Check Application Status'),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppTheme.primary,
                               minimumSize: const Size.fromHeight(48),
@@ -304,56 +309,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                     const SizedBox(height: 24),
-
-                    // ── Test credentials ──
-                    Center(
-                      child: Column(
-                        children: [
-                          RichText(
-                            textAlign: TextAlign.center,
-                            text: TextSpan(
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF6B7280),
-                                height: 1.5,
-                              ),
-                              children: [
-                                const TextSpan(text: 'Test account — '),
-                                TextSpan(
-                                  text: 'rider@invoiz.test',
-                                  style: TextStyle(
-                                    color: AppTheme.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const TextSpan(text: ' / password'),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          RichText(
-                            textAlign: TextAlign.center,
-                            text: TextSpan(
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF6B7280),
-                              ),
-                              children: [
-                                const TextSpan(text: 'Sellers: go to the '),
-                                TextSpan(
-                                  text: 'Invoiz Seller Center',
-                                  style: TextStyle(
-                                    color: AppTheme.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 40),
                   ],
                 ),
               ),
@@ -395,7 +350,7 @@ class _CurvedHeader extends StatelessWidget {
                   width: 72,
                   height: 72,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0F2942),
+                    color: AppColors.primaryDark,
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: Colors.white.withValues(alpha: 0.15),

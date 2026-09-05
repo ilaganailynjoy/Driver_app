@@ -82,7 +82,7 @@ class _CustomerDeliveryScreenState extends State<CustomerDeliveryScreen> {
                     Text(
                       customer.phone!,
                       style: const TextStyle(
-                          fontSize: 15, color: Color(0xFF4B5563)),
+                          fontSize: 15, color: AppColors.textSecondary),
                     ),
                   ],
                   if (customer.address != null &&
@@ -91,7 +91,7 @@ class _CustomerDeliveryScreenState extends State<CustomerDeliveryScreen> {
                     Text(
                       customer.address!,
                       style: const TextStyle(
-                          fontSize: 14, color: Color(0xFF4B5563)),
+                          fontSize: 14, color: AppColors.textSecondary),
                     ),
                   ],
                   const SizedBox(height: 16),
@@ -157,7 +157,7 @@ class _CustomerDeliveryScreenState extends State<CustomerDeliveryScreen> {
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w800,
-                            color: AppTheme.accent,
+                            color: AppTheme.secondary,
                           ),
                         ),
                       ],
@@ -195,7 +195,7 @@ class _CustomerDeliveryScreenState extends State<CustomerDeliveryScreen> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label,
-            style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280))),
+            style: const TextStyle(fontSize: 14, color: AppColors.textSecondary)),
         Text(value,
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
       ],

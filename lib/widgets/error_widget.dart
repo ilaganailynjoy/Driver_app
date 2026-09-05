@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/theme/app_theme.dart';
+
 /// Friendly error state with a retry button.
 class ErrorView extends StatelessWidget {
   const ErrorView({
@@ -20,13 +22,13 @@ class ErrorView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.cloud_off_outlined,
-                size: 56, color: Color(0xFF9AA3AF)),
+                size: 56, color: AppColors.textSecondary),
             const SizedBox(height: 16),
             Text(
               message,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: Color(0xFF1B1F24),
+                color: AppColors.textPrimary,
                 fontSize: 15,
                 height: 1.4,
               ),
@@ -76,10 +78,10 @@ class EmptyState extends StatelessWidget {
               width: 72,
               height: 72,
               decoration: BoxDecoration(
-                color: const Color(0xFFE6E9EF),
+                color: AppColors.border,
                 borderRadius: BorderRadius.circular(24),
               ),
-              child: Icon(icon, size: 34, color: const Color(0xFF6B7280)),
+              child: Icon(icon, size: 34, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 16),
             Text(
@@ -88,7 +90,7 @@ class EmptyState extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF1B1F24),
+                color: AppColors.textPrimary,
               ),
             ),
             if (message != null) ...[
@@ -98,7 +100,7 @@ class EmptyState extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 13,
-                  color: Color(0xFF6B7280),
+                  color: AppColors.textSecondary,
                   height: 1.4,
                 ),
               ),

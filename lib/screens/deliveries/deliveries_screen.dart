@@ -77,7 +77,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
               ),
             );
           },
-          trailing: const Icon(Icons.chevron_right, color: Color(0xFF9AA3AF)),
+          trailing: const Icon(Icons.chevron_right, color: AppColors.textSecondary),
         );
       },
     );
@@ -107,7 +107,7 @@ class _FilterBar extends StatelessWidget {
               onSelected: (_) => onChanged(entry.key),
               selectedColor: AppTheme.primary,
               labelStyle: TextStyle(
-                color: selected ? Colors.white : const Color(0xFF4B5563),
+                color: selected ? Colors.white : AppColors.textSecondary,
                 fontWeight: FontWeight.w600,
                 fontSize: 13,
               ),
@@ -127,7 +127,7 @@ class _EmptyDeliveries extends StatelessWidget {
     return const Column(
       children: [
         SizedBox(height: 40),
-        Icon(Icons.inventory_2_outlined, size: 56, color: Color(0xFF9AA3AF)),
+        Icon(Icons.inventory_2_outlined, size: 56, color: AppColors.textSecondary),
         SizedBox(height: 16),
         Text(
           'No deliveries here',
@@ -136,7 +136,7 @@ class _EmptyDeliveries extends StatelessWidget {
         SizedBox(height: 6),
         Text(
           'New assignments will appear here.',
-          style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
         ),
       ],
     );

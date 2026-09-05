@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/theme/app_theme.dart';
+
 /// Loading indicator with optional label.
 class LoadingWidget extends StatelessWidget {
   const LoadingWidget({super.key, this.label});
@@ -17,7 +19,7 @@ class LoadingWidget extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               label!,
-              style: const TextStyle(color: Color(0xFF6B7280)),
+              style: const TextStyle(color: AppColors.textSecondary),
             ),
           ],
         ],

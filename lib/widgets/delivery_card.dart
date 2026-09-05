@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/theme/app_theme.dart';
 import '../core/utils/format_utils.dart';
 import '../models/delivery.dart';
 import 'status_badge.dart';
@@ -70,7 +71,7 @@ class DeliveryCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF1E6F5C),
+                        color: AppColors.primary,
                       ),
                     ),
                   ),
@@ -79,13 +80,13 @@ class DeliveryCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFF9F1C).withValues(alpha: 0.12),
+                        color: AppColors.secondary.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Text(
                         'COD',
                         style: TextStyle(
-                          color: Color(0xFFB26A00),
+                          color: AppColors.secondary,
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                         ),
@@ -121,7 +122,7 @@ class _Row extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 18, color: const Color(0xFF9AA3AF)),
+        Icon(icon, size: 18, color: AppColors.textSecondary),
         const SizedBox(width: 8),
         Expanded(
           child: Text.rich(
@@ -131,13 +132,13 @@ class _Row extends StatelessWidget {
                 TextSpan(
                   text: '$label: ',
                   style: const TextStyle(
-                    color: Color(0xFF6B7280),
+                    color: AppColors.textSecondary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 TextSpan(
                   text: value,
-                  style: const TextStyle(color: Color(0xFF1B1F24)),
+                  style: const TextStyle(color: AppColors.textPrimary),
                 ),
               ],
             ),

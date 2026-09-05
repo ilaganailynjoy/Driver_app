@@ -14,6 +14,21 @@ class ApplicationReference {
   }
 }
 
+/// A submitted supporting document echoed back by the status endpoint.
+class ApplicationStatusDoc {
+  const ApplicationStatusDoc({required this.type, required this.name});
+  final String type;
+  final String name;
+
+  factory ApplicationStatusDoc.fromJson(Map<String, dynamic> j) =>
+      ApplicationStatusDoc(
+        type: j['type'] as String? ?? '',
+        name: j['name'] as String? ?? '',
+      );
+
+  String get label => type.replaceAll('_', ' ').toUpperCase();
+}
+
 class RiderApplicationStatus {
   const RiderApplicationStatus({
     required this.id,
@@ -26,6 +41,7 @@ class RiderApplicationStatus {
     this.createdAt,
     this.reviewedAt,
     this.notes,
+    this.documents = const [],
   });
   final int id;
   final String name;
@@ -37,22 +53,32 @@ class RiderApplicationStatus {
   final String? createdAt;
   final String? reviewedAt;
   final String? notes;
+  final List<ApplicationStatusDoc> documents;
 
   String get referenceNumber => ApplicationReference.forId(id);
 
-  factory RiderApplicationStatus.fromJson(Map<String, dynamic> j) =>
-      RiderApplicationStatus(
-        id: (j['id'] as num?)?.toInt() ?? 0,
-        name: j['name'] as String? ?? '',
-        email: j['email'] as String? ?? '',
-        status: j['status'] as String? ?? 'pending',
-        submittedVia: j['submitted_via'] as String?,
-        riderType: j['rider_type'] as String?,
-        vehicleOwnership: j['vehicle_ownership'] as String?,
-        createdAt: j['created_at'] as String?,
-        reviewedAt: j['reviewed_at'] as String?,
-        notes: j['notes'] as String?,
-      );
+  factory RiderApplicationStatus.fromJson(Map<String, dynamic> j) {
+    List<ApplicationStatusDoc> docs = [];
+    if (j['documents'] is List) {
+      docs = (j['documents'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map(ApplicationStatusDoc.fromJson)
+          .toList();
+    }
+    return RiderApplicationStatus(
+      id: (j['id'] as num?)?.toInt() ?? 0,
+      name: j['name'] as String? ?? '',
+      email: j['email'] as String? ?? '',
+      status: j['status'] as String? ?? 'pending',
+      submittedVia: j['submitted_via'] as String?,
+      riderType: j['rider_type'] as String?,
+      vehicleOwnership: j['vehicle_ownership'] as String?,
+      createdAt: j['created_at'] as String?,
+      reviewedAt: j['reviewed_at'] as String?,
+      notes: j['notes'] as String?,
+      documents: docs,
+    );
+  }
 }
 
 /// Result of a successful application submission.

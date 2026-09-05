@@ -68,6 +68,25 @@ class Delivery {
         'arrived_at_customer',
       ].contains(status);
 
+  /// Statuses that belong in the rider-facing Status History.
+  ///
+  /// Logistics parcel events (waiting_for_rider, received, scanned, sorted,
+  /// archived, restored) are real records but are not rider workflow steps,
+  /// so they are excluded here. Only actually recorded events are shown —
+  /// never a predefined list of future statuses.
+  static const riderHistoryStatuses = {
+    'assigned',
+    'accepted',
+    'going_to_pickup',
+    'arrived_at_shop',
+    'picked_up',
+    'out_for_delivery',
+    'arrived_at_customer',
+    'delivered',
+    'delivery_failed',
+    'cancelled',
+  };
+
   factory Delivery.fromJson(Map<String, dynamic> json) {
     List<DeliveryItem> items = [];
     if (json['items'] is List) {
@@ -82,7 +101,17 @@ class Delivery {
       logs = (json['status_logs'] as List)
           .whereType<Map<String, dynamic>>()
           .map(StatusLog.fromJson)
-          .toList();
+          .where((log) => riderHistoryStatuses.contains(log.status))
+          .toList()
+        // Chronological (oldest first) by actual record timestamp.
+        ..sort((a, b) {
+          final ac = a.createdAt;
+          final bc = b.createdAt;
+          if (ac == null && bc == null) return 0;
+          if (ac == null) return 1;
+          if (bc == null) return -1;
+          return ac.compareTo(bc);
+        });
     }
 
     String? proofType;

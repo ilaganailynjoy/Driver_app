@@ -49,6 +49,21 @@ class RiderService {
         Map<String, dynamic>.from(data['rider'] as Map? ?? {}));
   }
 
+  /// Change the authenticated rider's password. Throws [ApiException]
+  /// with the backend message (e.g. wrong current password).
+  /// The password is only ever sent in the request body, never stored.
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    await _api.patch('/rider/password', body: {
+      'current_password': currentPassword,
+      'password': newPassword,
+      'password_confirmation': confirmPassword,
+    });
+  }
+
   Future<Rider> updateStatus(String status) async {
     final data = await _api.patch('/rider/status', body: {'status': status});
     return Rider.fromJson(

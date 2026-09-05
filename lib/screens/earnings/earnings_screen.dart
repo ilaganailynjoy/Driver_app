@@ -90,7 +90,7 @@ class EarningsScreen extends StatelessWidget {
                 label: 'This Month',
                 value: FormatUtils.peso(summary.thisMonth),
                 icon: Icons.calendar_month_outlined,
-                color: const Color(0xFFF29900),
+                color: AppColors.secondary,
               ),
             ),
           ],
@@ -124,7 +124,7 @@ class EarningsScreen extends StatelessWidget {
               child: Center(
                 child: Text(
                   'No earnings recorded yet.',
-                  style: TextStyle(color: Color(0xFF6B7280)),
+                  style: TextStyle(color: AppColors.textSecondary),
                 ),
               ),
             ),

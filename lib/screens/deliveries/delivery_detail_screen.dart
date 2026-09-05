@@ -61,7 +61,7 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
         title: Text(delivery.trackingNumber),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(color: const Color(0xFFE6E9EF), height: 1),
+          child: Container(color: AppColors.border, height: 1),
         ),
       ),
       body: RefreshIndicator(
@@ -123,7 +123,7 @@ class _StatusHeader extends StatelessWidget {
                     'Order #${delivery.orderId ?? delivery.trackingNumber}',
                     style: const TextStyle(
                       fontSize: 12,
-                      color: Color(0xFF6B7280),
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -211,7 +211,7 @@ class _OrderSection extends StatelessWidget {
                 padding: EdgeInsets.symmetric(vertical: 8),
                 child: Text(
                   'No item details available.',
-                  style: TextStyle(color: Color(0xFF6B7280), fontSize: 13),
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                 ),
               )
             else
@@ -237,7 +237,7 @@ class _OrderSection extends StatelessWidget {
                                 item.variantLabel!,
                                 style: const TextStyle(
                                   fontSize: 12,
-                                  color: Color(0xFF6B7280),
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                           ],
@@ -428,14 +428,14 @@ class _TimelineSection extends StatelessWidget {
                               log.notes!,
                               style: const TextStyle(
                                 fontSize: 12,
-                                color: Color(0xFF6B7280),
+                                color: AppColors.textSecondary,
                               ),
                             ),
                           Text(
                             FormatUtils.dateTime(log.createdAt),
                             style: const TextStyle(
                               fontSize: 11,
-                              color: Color(0xFF9AA3AF),
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         ],
@@ -693,7 +693,7 @@ class _InfoRow extends StatelessWidget {
           child: Text(
             label,
             style: const TextStyle(
-              color: Color(0xFF6B7280),
+              color: AppColors.textSecondary,
               fontSize: 13,
               fontWeight: FontWeight.w500,
             ),
@@ -705,7 +705,7 @@ class _InfoRow extends StatelessWidget {
             style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF1B1F24),
+              color: AppColors.textPrimary,
               height: 1.35,
             ),
           ),
@@ -738,7 +738,7 @@ class _TotalRow extends StatelessWidget {
             style: TextStyle(
               fontSize: 14,
               fontWeight: bold ? FontWeight.w800 : FontWeight.w500,
-              color: bold ? const Color(0xFF1B1F24) : const Color(0xFF6B7280),
+              color: bold ? AppColors.textPrimary : AppColors.textSecondary,
             ),
           ),
           Text(
@@ -746,7 +746,7 @@ class _TotalRow extends StatelessWidget {
             style: TextStyle(
               fontSize: 14,
               fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
-              color: bold ? AppTheme.primary : const Color(0xFF1B1F24),
+              color: bold ? AppTheme.primary : AppColors.textPrimary,
             ),
           ),
         ],
