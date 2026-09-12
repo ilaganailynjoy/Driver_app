@@ -9,11 +9,14 @@ import 'providers/delivery_provider.dart';
 import 'providers/earnings_provider.dart';
 import 'providers/notification_provider.dart';
 import 'providers/rider_provider.dart';
+import 'screens/auth/login_screen.dart';
 import 'screens/splash/splash_screen.dart';
+import 'services/deep_link_service.dart';
 import 'services/delivery_service.dart';
 import 'services/earnings_service.dart';
 import 'services/notification_service.dart';
 import 'services/rider_service.dart';
+import 'widgets/deep_link_broker.dart';
 
 void mainFromDriver() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,14 +24,30 @@ void mainFromDriver() {
   final api = ApiClient();
   final storage = TokenStorage();
   final authProvider = AuthProvider(api: api, storage: storage);
+  final navKey = GlobalKey<NavigatorState>();
+  final routeTracker = RouteNameTracker();
 
-  runApp(InvoizeRiderApp(authProvider: authProvider));
+  runApp(InvoizeRiderApp(
+    authProvider: authProvider,
+    navKey: navKey,
+    routeTracker: routeTracker,
+    deepLinks: AppLinksDeepLinkService(),
+  ));
 }
 
 class InvoizeRiderApp extends StatelessWidget {
-  const InvoizeRiderApp({super.key, required this.authProvider});
+  const InvoizeRiderApp({
+    super.key,
+    required this.authProvider,
+    required this.navKey,
+    required this.routeTracker,
+    this.deepLinks,
+  });
 
   final AuthProvider authProvider;
+  final GlobalKey<NavigatorState> navKey;
+  final RouteNameTracker routeTracker;
+  final DeepLinkService? deepLinks;
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +73,23 @@ class InvoizeRiderApp extends StatelessWidget {
         title: 'Invoize Rider',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light(),
+        navigatorKey: navKey,
+        navigatorObservers: [routeTracker],
+        onGenerateRoute: (settings) {
+          if (settings.name == DeepLinkService.loginRouteName) {
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => const LoginScreen(),
+            );
+          }
+          return null;
+        },
+        builder: (context, child) => AppDeepLinkBroker(
+          service: deepLinks,
+          navKey: navKey,
+          routeTracker: routeTracker,
+          child: child,
+        ),
         home: const AppGate(),
       ),
     );

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,7 +8,9 @@ import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/vehicle_icons.dart';
+import '../../services/address_service.dart';
 import '../../services/application_service.dart';
+import '../../widgets/address_fields.dart';
 import '../../services/vehicle_service.dart';
 import '../../widgets/primary_button.dart';
 import 'application_status_screen.dart';
@@ -16,9 +20,10 @@ import 'apply_widgets.dart';
 ///
 /// Steps: Personal → Rider Type → Vehicle → Requirements → Documents → Review.
 /// Uses the existing `POST /api/rider/apply` contract (single `name` field,
-/// backend document keys) — no backend changes. First/last name are combined
-/// into `name`; sex and date of birth are validated client-side (the
-/// application record has no columns for them) and are not submitted.
+/// backend document keys). First/last/middle name are combined into `name`;
+/// sex, date of birth and the PSGC structured address (house number, street,
+/// barangay, municipality, province) are submitted alongside. The backend
+/// derives the applicant's age from the birth date (min 18).
 /// A single file chosen through the native picker, surfaced as plain data
 /// so the upload flow never touches `dart:io` (web-safe).
 class PickedDoc {
@@ -46,7 +51,11 @@ class DocFilePicker {
 }
 
 class ApplyScreen extends StatefulWidget {
-  const ApplyScreen({super.key, this.picker = const DocFilePicker()});
+  const ApplyScreen(
+      {super.key, this.picker = const DocFilePicker(), this.apiClient});
+
+  /// Shared API client (injectable in tests; defaults to a live client).
+  final ApiClient? apiClient;
 
   /// File extensions applicants may attach. A subset of the mimes the
   /// existing `POST /api/rider/apply` endpoint accepts
@@ -81,12 +90,23 @@ class _ApplyScreenState extends State<ApplyScreen> {
 
   // Step 1 — personal.
   final _firstName = TextEditingController();
+  final _middleInitial = TextEditingController();
   final _lastName = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
-  final _address = TextEditingController();
-  String? _sex; // client-side only (no backend column).
-  DateTime? _dob; // client-side only (no backend column).
+  AddressSelection? _addressSel;
+  String? _sex;
+  DateTime? _dob;
+
+  // Step 1 — email OTP verification (server-enforced; the client flag is
+  // convenience only and is always re-checked by POST /api/rider/apply).
+  final _otpCode = TextEditingController();
+  String? _emailVerifiedFor; // exact address that completed verification
+  String? _codeSentTo; // address the current pending code was sent to
+  bool _sendingCode = false;
+  bool _verifyingCode = false;
+  int _resendIn = 0;
+  Timer? _resendTimer;
 
   // Step 2 — rider type (backend values).
   String _riderType = 'full_time';
@@ -127,8 +147,31 @@ class _ApplyScreenState extends State<ApplyScreen> {
   @override
   void initState() {
     super.initState();
+    _email.addListener(_onEmailChanged);
     _loadVehicles();
   }
+
+  /// Changing the email instantly invalidates any previous verification —
+  /// a code for one address can never authorize another.
+  void _onEmailChanged() {
+    final current = _email.text.trim();
+    var changed = false;
+    if (_emailVerifiedFor != null && _emailVerifiedFor != current) {
+      _emailVerifiedFor = null;
+      changed = true;
+    }
+    if (_codeSentTo != null && _codeSentTo != current) {
+      _codeSentTo = null;
+      _otpCode.clear();
+      changed = true;
+    }
+    if (changed && mounted) setState(() {});
+  }
+
+  bool get _isEmailVerified =>
+      _emailVerifiedFor != null &&
+      _emailVerifiedFor == _email.text.trim() &&
+      _emailVerifiedFor!.isNotEmpty;
 
   Future<void> _loadVehicles() async {
     try {
@@ -166,6 +209,14 @@ class _ApplyScreenState extends State<ApplyScreen> {
       age--;
     }
     return age;
+  }
+
+  String _fullDisplayName() {
+    final first = _firstName.text.trim();
+    final middle = _middleInitial.text.trim();
+    final last = _lastName.text.trim();
+    if (middle.isNotEmpty) return '$first $middle. $last';
+    return '$first $last';
   }
 
   bool get _isFullTime => _riderType == 'full_time';
@@ -268,18 +319,97 @@ class _ApplyScreenState extends State<ApplyScreen> {
   static final _emailRegex =
       RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
 
+  ApplicationService get _appService =>
+      ApplicationService(widget.apiClient ?? ApiClient());
+
+  Future<void> _sendCode({bool resend = false}) async {
+    final email = _email.text.trim();
+    if (!_emailRegex.hasMatch(email)) {
+      _snack('Please enter a valid email address first.');
+      return;
+    }
+    if (_sendingCode) return;
+    setState(() => _sendingCode = true);
+    try {
+      final name =
+          '${_firstName.text.trim()} ${_lastName.text.trim()}'.trim();
+      final message = resend
+          ? await _appService.resendEmailCode(email: email)
+          : await _appService.requestEmailCode(
+              email: email, name: name.isEmpty ? null : name);
+      if (!mounted) return;
+      setState(() {
+        _codeSentTo = email;
+        _otpCode.clear();
+      });
+      _startResendCooldown();
+      _snack(message);
+    } on ApiException catch (e) {
+      if (mounted) _snack(e.message);
+    } catch (_) {
+      if (mounted) _snack('Unable to connect. Please try again.');
+    } finally {
+      if (mounted) setState(() => _sendingCode = false);
+    }
+  }
+
+  void _startResendCooldown() {
+    _resendTimer?.cancel();
+    setState(() => _resendIn = 60);
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_resendIn <= 1) {
+        timer.cancel();
+        setState(() => _resendIn = 0);
+      } else {
+        setState(() => _resendIn--);
+      }
+    });
+  }
+
+  Future<void> _verifyCode() async {
+    final email = _email.text.trim();
+    final code = _otpCode.text.trim();
+    if (code.length != 6) {
+      _snack('Please enter the 6-digit verification code.');
+      return;
+    }
+    if (_verifyingCode) return;
+    setState(() => _verifyingCode = true);
+    try {
+      await _appService.verifyEmailCode(email: email, code: code);
+      if (!mounted) return;
+      setState(() => _emailVerifiedFor = email);
+      _snack('Email verified successfully.');
+    } on ApiException catch (e) {
+      if (mounted) _snack(e.message);
+    } catch (_) {
+      if (mounted) _snack('Unable to connect. Please try again.');
+    } finally {
+      if (mounted) setState(() => _verifyingCode = false);
+    }
+  }
+
   String? _validatePersonal() {
     if (_firstName.text.trim().isEmpty) return 'Please enter your first name.';
     if (_lastName.text.trim().isEmpty) return 'Please enter your last name.';
     if (!_emailRegex.hasMatch(_email.text.trim())) {
       return 'Please enter a valid email address.';
     }
+    if (!_isEmailVerified) {
+      return 'Please verify your email address first.';
+    }
     final digits = _phone.text.replaceAll(RegExp(r'\D'), '');
     if (digits.length < 10) return 'Please enter a valid phone number.';
     if (_sex == null) return 'Please select your sex.';
     if (_dob == null) return 'Please select your date of birth.';
     if (_age < 18) return 'You must be at least 18 years old to apply.';
-    if (_address.text.trim().isEmpty) return 'Please enter your address.';
+    if (_addressSel?.complete != true) {
+      return 'Please select your Province, City/Municipality and Barangay.';
+    }
     return null;
   }
 
@@ -381,10 +511,10 @@ class _ApplyScreenState extends State<ApplyScreen> {
     setState(() => _submitting = true);
     try {
       final result = await ApplicationService(ApiClient()).submit(
-        name: '${_firstName.text.trim()} ${_lastName.text.trim()}',
+        name: _fullDisplayName(),
         email: _email.text.trim(),
         phone: _phone.text.trim(),
-        address: _address.text.trim(),
+        address: _addressSel?.composed ?? '',
         vehicleType: _vehicleType ?? '',
         licensePlate: _plate.text.trim(),
         licenseNumber: _licenseNo.text.trim(),
@@ -392,6 +522,18 @@ class _ApplyScreenState extends State<ApplyScreen> {
         riderType: _riderType,
         vehicleOwnership: _ownership,
         documents: _docs,
+        middleInitial: _middleInitial.text.trim(),
+        sex: _sex,
+        birthday: _dob == null
+            ? null
+            : '${_dob!.year.toString().padLeft(4, '0')}-'
+                '${_dob!.month.toString().padLeft(2, '0')}-'
+                '${_dob!.day.toString().padLeft(2, '0')}',
+        houseNumber: _addressSel?.houseNumber ?? '',
+        street: _addressSel?.street ?? '',
+        barangay: _addressSel?.barangay?.name ?? '',
+        municipality: _addressSel?.municipality?.name ?? '',
+        province: _addressSel?.province?.name ?? '',
       );
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
@@ -424,11 +566,14 @@ class _ApplyScreenState extends State<ApplyScreen> {
 
   @override
   void dispose() {
+    _email.removeListener(_onEmailChanged);
+    _resendTimer?.cancel();
     _firstName.dispose();
+    _middleInitial.dispose();
     _lastName.dispose();
     _email.dispose();
+    _otpCode.dispose();
     _phone.dispose();
-    _address.dispose();
     _plate.dispose();
     _licenseNo.dispose();
     _vehicleReg.dispose();
@@ -520,11 +665,24 @@ class _ApplyScreenState extends State<ApplyScreen> {
           children: [
             Expanded(child: _field(_firstName, 'First Name *', Icons.person_outline)),
             const SizedBox(width: 12),
+            SizedBox(
+              width: 84,
+              child: _field(_middleInitial, 'M.I.', null),
+            ),
+            const SizedBox(width: 12),
             Expanded(child: _field(_lastName, 'Last Name *', null)),
           ],
         ),
-        _field(_email, 'Email *', Icons.email_outlined,
+        _field(_email, 'Email Address *', Icons.email_outlined,
             keyboard: TextInputType.emailAddress),
+        const Padding(
+          padding: EdgeInsets.only(bottom: 12),
+          child: Text(
+            "Enter an email address you can access. We'll send a verification code to this email.",
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+        ),
+        _emailVerificationSection(),
         _field(_phone, 'Phone Number *  (+639 / 09)', Icons.phone_outlined,
             keyboard: TextInputType.phone),
         const Text('Sex *',
@@ -563,8 +721,177 @@ class _ApplyScreenState extends State<ApplyScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        _field(_address, 'Address *', Icons.home_outlined, maxLines: 2),
+        const Text('Address *',
+            style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary)),
+        const SizedBox(height: 8),
+        AddressFields(
+          onChanged: (sel) => setState(() => _addressSel = sel),
+          apiClient: widget.apiClient,
+        ),
       ],
+    );
+  }
+
+  Widget _emailVerificationSection() {
+    final email = _email.text.trim();
+
+    if (_isEmailVerified) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.success.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+                color: AppColors.success.withValues(alpha: 0.4)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.check_circle,
+                  size: 20, color: AppColors.success),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Email verified',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.success,
+                      ),
+                    ),
+                    Text(
+                      _emailVerifiedFor!,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final codePending =
+        _codeSentTo != null && _codeSentTo == email && email.isNotEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (codePending) ...[
+              const Text(
+                'Verify Your Email',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'We sent a 6-digit verification code to:\n$email',
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _otpCode,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                decoration: const InputDecoration(
+                  labelText: 'Verification Code',
+                  hintText: 'Enter 6-digit code',
+                  counterText: '',
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 52,
+                child: ElevatedButton(
+                  onPressed:
+                      _verifyingCode ? null : _verifyCode,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: _verifyingCode
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Verify Email',
+                          style:
+                              TextStyle(fontWeight: FontWeight.w600)),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Center(
+                child: TextButton(
+                  onPressed: (_sendingCode || _resendIn > 0)
+                      ? null
+                      : () => _sendCode(resend: true),
+                  child: Text(
+                    _resendIn > 0
+                        ? 'Resend Code in ${_resendIn}s'
+                        : 'Resend Code',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ] else ...[
+              SizedBox(
+                height: 52,
+                child: OutlinedButton.icon(
+                  onPressed:
+                      _sendingCode ? null : () => _sendCode(),
+                  icon: const Icon(Icons.mark_email_read_outlined,
+                      size: 20),
+                  label: Text(_sendingCode
+                      ? 'Sending...'
+                      : 'Send Verification Code'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side:
+                        const BorderSide(color: AppColors.primary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -1000,14 +1327,13 @@ class _ApplyScreenState extends State<ApplyScreen> {
           title: 'PERSONAL INFORMATION',
           onEdit: () => _jumpTo(0),
           rows: [
-            MapEntry(
-                'Name', '${_firstName.text.trim()} ${_lastName.text.trim()}'),
+            MapEntry('Name', _fullDisplayName()),
             MapEntry('Email', _email.text.trim()),
             MapEntry('Phone', _phone.text.trim()),
             MapEntry('Sex',
                 _sex == 'male' ? 'Male' : (_sex == 'female' ? 'Female' : '-')),
             MapEntry('Date of Birth', '$_dobLabel  (Age: $_age)'),
-            MapEntry('Address', _address.text.trim()),
+            MapEntry('Address', _addressSel?.composed ?? '—'),
           ],
         ),
         const SizedBox(height: 12),

@@ -6,6 +6,8 @@ import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../apply/apply_screen.dart';
 import '../apply/application_status_screen.dart';
+import '../apply_center/apply_center_screen.dart';
+import '../apply_center/center_application_status_screen.dart';
 import '../home/home_shell.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/primary_button.dart';
@@ -307,6 +309,40 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // ── Open a Logistics Center / check center status ──
+                    OutlinedButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ApplyCenterScreen(),
+                        ),
+                      ),
+                      icon: const Icon(Icons.storefront_outlined, size: 18),
+                      label: const Text('Open a Logistics Center'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.primary,
+                        minimumSize: const Size.fromHeight(48),
+                        side: const BorderSide(color: AppTheme.primary),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const CenterApplicationStatusScreen(),
+                        ),
+                      ),
+                      child: const Text(
+                        'Check a logistics center application status',
+                        style: TextStyle(
+                            color: AppTheme.primary,
+                            fontWeight: FontWeight.w600),
+                      ),
                     ),
                     const SizedBox(height: 24),
                   ],

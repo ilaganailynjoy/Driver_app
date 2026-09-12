@@ -1,13 +1,14 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Environment-aware application configuration.
 ///
-/// - `development`: points at the local Laravel server.
-///   * Android emulator: `http://10.0.2.2:8000/api`
-///   * Physical phone (USB): `http://192.168.1.22:8000/api`
-///   * Desktop / web: `http://localhost:8000/api`
+/// Resolution order for the API base URL:
+///   1. `.env` file (`API_BASE_URL` key) — primary source.
+///   2. `--dart-define=API_BASE_URL=...` at build time — fallback.
+///   3. Hard-coded defaults per platform.
 class AppConfig {
   AppConfig._();
 
@@ -17,15 +18,10 @@ class AppConfig {
     defaultValue: 'development',
   );
 
-  /// LAN IP of this PC — used by physical phones connected via USB or Wi-Fi.
-  /// If the PC gets a different DHCP address, update this (or pass
-  /// `API_BASE_URL` via dart-define at build time).
-  static const String lanHost = 'http://192.168.1.17:8000/api';
-
-  /// Base URL used while running locally (override via dart-define).
-  static const String devHost = String.fromEnvironment(
+  /// Dart-define fallback (used when `.env` does not contain the key).
+  static const String _dartDefineUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://192.168.1.17:8000/api',
+    defaultValue: '',
   );
 
   /// Base URL for a production Laravel deployment.
@@ -35,21 +31,30 @@ class AppConfig {
   );
 
   /// The resolved API base URL.
+  ///
+  /// Prefers the value from `.env` (loaded by `flutter_dotenv`), then falls
+  /// back to the dart-define value, then to platform-specific defaults.
   static String get apiBaseUrl {
+    // 1. .env file (primary) — guarded so tests that don't load .env still work.
+    try {
+      final envUrl = dotenv.env['API_BASE_URL'];
+      if (envUrl != null && envUrl.isNotEmpty) return envUrl;
+    } on Error {
+      // dotenv not initialized (e.g. in tests) — fall through.
+    }
+
+    // 2. Dart-define (build-time fallback)
+    if (_dartDefineUrl.isNotEmpty) return _dartDefineUrl;
+
+    // 3. Platform defaults
     if (kIsWeb) return 'http://localhost:8000/api';
     if (Platform.isAndroid) {
-      if (environment == 'production') return prodHost;
-      // For physical devices: the dart-define overrides the default.
-      // Default devHost is the emulator address; physical devices use LAN IP.
-      return devHost;
+      return environment == 'production'
+          ? prodHost
+          : 'http://10.0.2.2:8000/api';
     }
-    // iOS simulator, Windows, Linux, macOS
     return environment == 'production'
         ? prodHost
         : 'http://localhost:8000/api';
   }
-
-  /// Convenience getter for the physical-device LAN address.
-  /// Use this when running on a real phone via USB or Wi-Fi.
-  static String get physicalDeviceUrl => lanHost;
 }

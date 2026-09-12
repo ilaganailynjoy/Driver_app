@@ -111,6 +111,14 @@ class ApplicationService {
     required String riderType,
     required String vehicleOwnership,
     required Map<String, ({Uint8List bytes, String filename})> documents,
+    String? middleInitial,
+    String? sex,
+    String? birthday,
+    String? houseNumber,
+    String? street,
+    String? barangay,
+    String? municipality,
+    String? province,
   }) async {
     final fields = <String, String>{
       'name': name,
@@ -123,6 +131,20 @@ class ApplicationService {
       'vehicle_registration': vehicleRegistration,
       'rider_type': riderType,
       'vehicle_ownership': vehicleOwnership,
+      if (middleInitial != null && middleInitial.trim().isNotEmpty)
+        'middle_initial': middleInitial.trim(),
+      if (sex != null && sex.trim().isNotEmpty) 'sex': sex.trim(),
+      if (birthday != null && birthday.trim().isNotEmpty)
+        'birthday': birthday.trim(),
+      if (houseNumber != null && houseNumber.trim().isNotEmpty)
+        'house_number': houseNumber.trim(),
+      if (street != null && street.trim().isNotEmpty) 'street': street.trim(),
+      if (barangay != null && barangay.trim().isNotEmpty)
+        'barangay': barangay.trim(),
+      if (municipality != null && municipality.trim().isNotEmpty)
+        'municipality': municipality.trim(),
+      if (province != null && province.trim().isNotEmpty)
+        'province': province.trim(),
     };
     final files = <String, ({Uint8List bytes, String filename})>{};
     documents.forEach((k, v) => files['documents[$k]'] = v);
@@ -137,6 +159,40 @@ class ApplicationService {
       status: app['status'] as String? ?? 'pending',
       submittedVia: app['submitted_via'] as String?,
     );
+  }
+
+  /// Request a 6-digit email verification code (60s resend cooldown).
+  /// Returns the backend message. Throws [ApiException] on failure.
+  Future<String> requestEmailCode({
+    required String email,
+    String? name,
+  }) async {
+    final data = await _api.post('/rider/email/request-code', body: {
+      'email': email,
+      if (name != null && name.isNotEmpty) 'name': name,
+    }) as Map<String, dynamic>;
+    return data['message'] as String? ?? 'Verification code sent.';
+  }
+
+  /// Resend the code (invalidates the previous one). Same contract.
+  Future<String> resendEmailCode({required String email}) async {
+    final data = await _api.post('/rider/email/resend', body: {
+      'email': email,
+    }) as Map<String, dynamic>;
+    return data['message'] as String? ?? 'Verification code sent.';
+  }
+
+  /// Verify the code. Returns the verified email address.
+  /// Throws [ApiException] for invalid/expired/over-attempted codes.
+  Future<String> verifyEmailCode({
+    required String email,
+    required String code,
+  }) async {
+    final data = await _api.post('/rider/email/verify', body: {
+      'email': email,
+      'code': code,
+    }) as Map<String, dynamic>;
+    return data['email'] as String? ?? email;
   }
 
   Future<RiderApplicationStatus?> getStatus(String email) async {

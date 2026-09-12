@@ -8,6 +8,7 @@ import '../../providers/rider_provider.dart';
 import '../../widgets/error_widget.dart';
 import '../../widgets/loading_widget.dart';
 import 'change_password_screen.dart';
+import '../earnings/earnings_screen.dart';
 
 /// Rider profile: account info, stats, edit + logout.
 class ProfileScreen extends StatelessWidget {
@@ -140,6 +141,53 @@ class ProfileScreen extends StatelessWidget {
                 value: licensePlate ?? '—',
               ),
             ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Earnings',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 10),
+        Card(
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const EarningsScreen(),
+              ),
+            ),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Icon(Icons.savings_outlined,
+                      size: 20, color: AppColors.textSecondary),
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Earnings & Delivery History',
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w600),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Daily, weekly and monthly earnings report',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right,
+                      color: AppColors.textSecondary),
+                ],
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 16),

@@ -12,6 +12,7 @@ import '../../widgets/error_widget.dart';
 import '../../widgets/loading_widget.dart';
 import '../deliveries/deliveries_screen.dart';
 import '../deliveries/delivery_detail_screen.dart';
+import '../earnings/earnings_screen.dart';
 
 /// Rider dashboard: greeting, availability switch, stats, earnings,
 /// current delivery and recent completions.
@@ -120,7 +121,10 @@ class DashboardScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 20),
-        _EarningsBanner(amount: dashboard?.todayEarnings ?? 0),
+        _EarningsBanner(
+          amount: dashboard?.todayEarnings ?? 0,
+          onTap: () => _openEarnings(context),
+        ),
         const SizedBox(height: 16),
         if (dashboard?.currentDelivery != null) ...[
           const Text(
@@ -177,6 +181,12 @@ class DashboardScreen extends StatelessWidget {
   void _goToDeliveriesTab(BuildContext context) {
     Navigator.of(context)
         .push(MaterialPageRoute(builder: (_) => const DeliveriesScreen()));
+  }
+
+  void _openEarnings(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const EarningsScreen()),
+    );
   }
 
   void _goToFiltered(BuildContext context, String filter) {
@@ -271,44 +281,59 @@ class _Header extends StatelessWidget {
 }
 
 class _EarningsBanner extends StatelessWidget {
-  const _EarningsBanner({required this.amount});
+  const _EarningsBanner({required this.amount, this.onTap});
 
   final double amount;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppTheme.primary, AppTheme.primaryDark],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "Today's Earnings",
-            style: TextStyle(color: Colors.white70, fontSize: 13),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            FormatUtils.peso(amount),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 30,
-              fontWeight: FontWeight.w800,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [AppTheme.primary, AppTheme.primaryDark],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
+            borderRadius: BorderRadius.circular(18),
           ),
-          const SizedBox(height: 12),
-          const Text(
-            'Keep delivering to earn more!',
-            style: TextStyle(color: Colors.white60, fontSize: 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Today's Earnings",
+                      style: TextStyle(color: Colors.white70, fontSize: 13),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      FormatUtils.peso(amount),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 30,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Tap to view your earnings & delivery history',
+                      style: TextStyle(color: Colors.white60, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: Colors.white70),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

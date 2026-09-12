@@ -20,7 +20,6 @@ class EarningsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Earnings'),
-        automaticallyImplyLeading: false,
       ),
       body: RefreshIndicator(
         onRefresh: provider.loadSummary,

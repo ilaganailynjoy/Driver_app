@@ -1,6 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:invoize_rider/core/network/api_client.dart';
 import 'package:invoize_rider/screens/apply/apply_screen.dart';
 
 /// Picker-boundary tests for the Documents step.
@@ -27,12 +32,108 @@ PickedDoc docOf(String name, [int size = 1500]) => PickedDoc(
           Uint8List.fromList(List.filled(size, 7)),
     );
 
+/// Backend for the RIDER apply wizard: email OTP + PSGC address data.
+/// Vehicle types fall back to the built-in list when the endpoint 404s.
+MockClient _applyBackend() {
+  return MockClient((http.BaseRequest request) async {
+    http.Response json(Object data, int status) => http.Response(
+          jsonEncode(data),
+          status,
+          headers: {'content-type': 'application/json'},
+        );
+    final path = request.url.path;
+    if (path.endsWith('/rider/email/request-code') ||
+        path.endsWith('/rider/email/resend')) {
+      return json({'message': 'Verification code sent.'}, 200);
+    }
+    if (path.endsWith('/rider/email/verify')) {
+      return json({
+        'message': 'Email verified successfully.',
+        'email': 'juan.test@example.com'
+      }, 200);
+    }
+    if (path.endsWith('/provinces')) {
+      return json({
+        'provinces': [
+          {'id': 120000000, 'name': 'SOCCSKSARGEN'}
+        ]
+      }, 200);
+    }
+    if (!path.endsWith('/provinces') && path.endsWith('/municipalities')) {
+      return json({
+        'municipalities': [
+          {'id': 1200100000, 'name': 'General Santos City'}
+        ]
+      }, 200);
+    }
+    if (path.endsWith('/barangays')) {
+      return json({
+        'barangays': [
+          {'id': 1200100001, 'name': 'Barangay Poblacion'}
+        ]
+      }, 200);
+    }
+    return json({'message': 'not found'}, 404);
+  });
+}
+
+/// Selects Province → City/Municipality → Barangay by keyboard (overlay
+/// menu taps are unreliable in the cascade). Index 0, then 1, then 2.
+Future<void> _selectAddress(WidgetTester tester) async {
+  Future<void> pick(int index) async {
+    await tester.ensureVisible(find.byType(DropdownButton<String>).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(DropdownButton<String>).at(index),
+        warnIfMissed: false);
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+  }
+
+  await pick(0);
+  await pick(1);
+  await pick(2);
+}
+
+/// Sends a code and verifies it, clearing the success SnackBar overlay so
+/// the next tap on Continue is not blocked.
+Future<void> _verifyEmail(WidgetTester tester) async {
+  await tester.ensureVisible(find.text('Send Verification Code'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Send Verification Code'));
+  for (var i = 0; i < 10; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  await tester.enterText(
+      find.widgetWithText(TextField, 'Verification Code'), '123456');
+  await tester.pump();
+  await tester.ensureVisible(find.text('Verify Email'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Verify Email'));
+  await tester.pumpAndSettle();
+  final sm =
+      tester.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger));
+  sm.clearSnackBars();
+  await tester.pumpAndSettle();
+}
+
 /// Drives Personal (valid) → Rider Type (default full-time) → Vehicle
 /// (default own) → Requirements → Documents. Ownership `own` keeps the
 /// required set to the trio + clearance card.
 Future<void> driveToDocuments(
     WidgetTester tester, FakeDocPicker picker) async {
-  await tester.pumpWidget(MaterialApp(home: ApplyScreen(picker: picker)));
+  tester.view.physicalSize = const Size(1080, 2400);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(() {
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+  });
+  await tester.pumpWidget(MaterialApp(
+      home: ApplyScreen(
+          apiClient: ApiClient(client: _applyBackend()), picker: picker)));
   await tester.pumpAndSettle();
 
   await tester.enterText(
@@ -40,22 +141,28 @@ Future<void> driveToDocuments(
   await tester.enterText(
       find.widgetWithText(TextField, 'Last Name *'), 'Dela Cruz');
   await tester.enterText(
-      find.widgetWithText(TextField, 'Email *'), 'juan.test@example.com');
+      find.widgetWithText(TextField, 'Email Address *'), 'juan.test@example.com');
   await tester.enterText(
       find.widgetWithText(TextField, 'Phone Number *  (+639 / 09)'),
       '09178881111');
   await tester.tap(find.text('Male'));
   await tester.pump();
   await tester.enterText(
-      find.widgetWithText(TextField, 'Address *'), '123 Test St');
+      find.widgetWithText(TextField, 'House No.'), '123');
+  await tester.enterText(
+      find.widgetWithText(TextField, 'Street'), 'Test St');
+  await _selectAddress(tester);
   await tester.ensureVisible(find.text('Select date'));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Select date'));
   await tester.pumpAndSettle();
   await tester.tap(find.text('OK'));
   await tester.pumpAndSettle();
+  await _verifyEmail(tester);
 
   await tester.tap(find.text('Continue')); // → rider type
+  await tester.pumpAndSettle();
+  await tester.ensureVisible(find.text('Continue'));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Continue')); // → vehicle (full-time default)
   await tester.pumpAndSettle();
