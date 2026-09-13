@@ -119,4 +119,18 @@ class DeliveryService {
     return Delivery.fromJson(
         Map<String, dynamic>.from(data['delivery'] as Map? ?? {}));
   }
+
+  Future<Delivery> sortingCenterHandoff(int id) async {
+    final data =
+        await _api.post('/rider/deliveries/$id/sorting-center-handoff');
+    return Delivery.fromJson(
+        Map<String, dynamic>.from(data['delivery'] as Map? ?? {}));
+  }
+
+  Future<Delivery> sortingCenterPickup(int id) async {
+    final data =
+        await _api.post('/rider/deliveries/$id/sorting-center-pickup');
+    return Delivery.fromJson(
+        Map<String, dynamic>.from(data['delivery'] as Map? ?? {}));
+  }
 }

@@ -29,6 +29,11 @@ class Delivery {
     this.failureReason,
     this.proofType,
     this.statusLogs = const [],
+    this.parcelStatus,
+    this.sortingCenterHandoffAt,
+    this.sortingCenterHandoffRiderId,
+    this.sortingCenterPickupAt,
+    this.sortingCenterPickupRiderId,
   });
 
   final int id;
@@ -55,6 +60,11 @@ class Delivery {
   final String? failureReason;
   final String? proofType;
   final List<StatusLog> statusLogs;
+  final String? parcelStatus;
+  final DateTime? sortingCenterHandoffAt;
+  final int? sortingCenterHandoffRiderId;
+  final DateTime? sortingCenterPickupAt;
+  final int? sortingCenterPickupRiderId;
 
   bool get isCashOnDelivery => paymentMethod == 'cash_on_delivery';
 
@@ -80,12 +90,20 @@ class Delivery {
     'going_to_pickup',
     'arrived_at_shop',
     'picked_up',
+    'sorting_center_handoff',
+    'sorting_center_pickup',
     'out_for_delivery',
     'arrived_at_customer',
     'delivered',
     'delivery_failed',
     'cancelled',
   };
+
+  /// Whether parcel has been handed over to sorting center by the pickup rider.
+  bool get hasSortingHandoff => sortingCenterHandoffAt != null;
+
+  /// Whether parcel has been picked up from sorting center by delivery rider.
+  bool get hasSortingPickup => sortingCenterPickupAt != null;
 
   factory Delivery.fromJson(Map<String, dynamic> json) {
     List<DeliveryItem> items = [];
@@ -146,6 +164,13 @@ class Delivery {
       failureReason: json['failure_reason'] as String?,
       proofType: proofType,
       statusLogs: logs,
+      parcelStatus: json['parcel_status'] as String?,
+      sortingCenterHandoffAt: _parseDate(json['sorting_center_handoff_at']),
+      sortingCenterHandoffRiderId:
+          (json['sorting_center_handoff_rider_id'] as num?)?.toInt(),
+      sortingCenterPickupAt: _parseDate(json['sorting_center_pickup_at']),
+      sortingCenterPickupRiderId:
+          (json['sorting_center_pickup_rider_id'] as num?)?.toInt(),
     );
   }
 
@@ -180,6 +205,11 @@ class Delivery {
       failureReason: failureReason,
       proofType: proofType,
       statusLogs: statusLogs,
+      parcelStatus: parcelStatus,
+      sortingCenterHandoffAt: sortingCenterHandoffAt,
+      sortingCenterHandoffRiderId: sortingCenterHandoffRiderId,
+      sortingCenterPickupAt: sortingCenterPickupAt,
+      sortingCenterPickupRiderId: sortingCenterPickupRiderId,
     );
   }
 }

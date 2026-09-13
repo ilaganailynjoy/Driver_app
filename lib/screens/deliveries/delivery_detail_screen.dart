@@ -467,6 +467,108 @@ class _ActionBar extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
+    // Already handed over — pickup rider's job is done; wait for center.
+    if (delivery.status == 'picked_up' &&
+        delivery.sortingCenterHandoffAt != null) {
+      return SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border:
+                  Border.all(color: AppColors.success.withValues(alpha: 0.18)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: const [
+                Icon(Icons.check_circle_outline,
+                    size: 18, color: AppColors.success),
+                SizedBox(width: 8),
+                Text('Parcel handed over to sorting center.',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.success)),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Special handoff/pickup actions take precedence over the generic next-step.
+    final handoffAction = _sortingCenterAction();
+    if (handoffAction != null) {
+      final isHandoff = delivery.status == 'picked_up' &&
+          delivery.sortingCenterHandoffAt == null;
+      final isPickup = (delivery.status == 'assigned' ||
+              delivery.status == 'accepted') &&
+          delivery.parcelStatus == 'sorted' &&
+          delivery.sortingCenterHandoffAt != null &&
+          delivery.sortingCenterPickupAt == null;
+      final label = isHandoff
+          ? 'Deliver to Sorting Center'
+          : isPickup
+              ? 'Pick Up from Sorting Center'
+              : handoffAction.label;
+      final icon = isHandoff
+          ? Icons.warehouse_outlined
+          : isPickup
+              ? Icons.inventory_2_outlined
+              : handoffAction.icon;
+
+      return SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isPickup)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.18)),
+                  ),
+                  child: const Text(
+                    'Parcel is sorted and ready at the center. Pick it up to start delivery.',
+                    style: TextStyle(
+                        fontSize: 12, color: AppColors.textSecondary),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ElevatedButton.icon(
+                onPressed:
+                    busy ? null : () => _onAction(context),
+                icon: busy
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Icon(icon, size: 20),
+                label: Text(busy ? 'Working...' : label),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final action = _nextAction(delivery.status);
 
     return SafeArea(
@@ -493,6 +595,25 @@ class _ActionBar extends StatelessWidget {
     );
   }
 
+  _Action? _sortingCenterAction() {
+    if (delivery.status == 'picked_up' &&
+        delivery.sortingCenterHandoffAt == null) {
+      return _Action('Deliver to Sorting Center', Icons.warehouse_outlined);
+    }
+    if ((delivery.status == 'assigned' || delivery.status == 'accepted') &&
+        delivery.parcelStatus == 'sorted' &&
+        delivery.sortingCenterHandoffAt != null &&
+        delivery.sortingCenterPickupAt == null) {
+      return _Action('Pick Up from Sorting Center', Icons.inventory_2_outlined);
+    }
+    // Already handed over: hide further pickup-rider actions.
+    if (delivery.status == 'picked_up' &&
+        delivery.sortingCenterHandoffAt != null) {
+      return null;
+    }
+    return null;
+  }
+
   _Action _nextAction(String status) {
     switch (status) {
       case 'assigned':
@@ -514,6 +635,50 @@ class _ActionBar extends StatelessWidget {
   }
 
   void _onAction(BuildContext context) {
+    // Sorting center handoff (pickup rider)
+    if (delivery.status == 'picked_up' &&
+        delivery.sortingCenterHandoffAt == null) {
+      _confirmThen(context,
+          title: 'Deliver to Sorting Center?',
+          message:
+              'Confirm this parcel has been handed over to the sorting center. This will record the handoff time.',
+          onConfirm: () async {
+            final provider = context.read<DeliveryProvider>();
+            final ok = await provider.sortingCenterHandoff(delivery.id);
+            if (!context.mounted) return;
+            if (ok) {
+              provider.loadDetail(delivery.id);
+              _snack(context, 'Parcel handed over to sorting center.');
+            } else {
+              _snack(context, provider.error ?? 'Unable to hand over.');
+            }
+          });
+      return;
+    }
+
+    // Sorting center pickup (delivery rider)
+    if ((delivery.status == 'assigned' || delivery.status == 'accepted') &&
+        delivery.parcelStatus == 'sorted' &&
+        delivery.sortingCenterHandoffAt != null &&
+        delivery.sortingCenterPickupAt == null) {
+      _confirmThen(context,
+          title: 'Pick Up from Sorting Center?',
+          message:
+              'Confirm you have collected this parcel from the sorting center. Parcel will be marked dispatched.',
+          onConfirm: () async {
+            final provider = context.read<DeliveryProvider>();
+            final ok = await provider.sortingCenterPickup(delivery.id);
+            if (!context.mounted) return;
+            if (ok) {
+              provider.loadDetail(delivery.id);
+              _snack(context, 'Parcel picked up from sorting center.');
+            } else {
+              _snack(context, provider.error ?? 'Unable to pick up.');
+            }
+          });
+      return;
+    }
+
     final provider = context.read<DeliveryProvider>();
 
     switch (delivery.status) {

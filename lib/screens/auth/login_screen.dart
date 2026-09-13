@@ -87,10 +87,12 @@ class _LoginScreenState extends State<LoginScreen> {
         await prefs.remove(_savedEmailKey);
       }
 
+      if (!mounted) return;
       Navigator.of(
         context,
       ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeShell()));
     } else {
+      if (!mounted) return;
       final error = auth.error;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(error ?? 'Login failed. Please try again.')),

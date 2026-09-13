@@ -137,6 +137,16 @@ class DeliveryProvider extends ChangeNotifier {
         _applyUpdated(updated);
       });
 
+  Future<bool> sortingCenterHandoff(int id) => _runAction(
+        'sortingCenterHandoff',
+        () async => _applyUpdated(await _service.sortingCenterHandoff(id)),
+      );
+
+  Future<bool> sortingCenterPickup(int id) => _runAction(
+        'sortingCenterPickup',
+        () async => _applyUpdated(await _service.sortingCenterPickup(id)),
+      );
+
   Future<bool> _runAction(String name, Future<void> Function() action) async {
     _actionBusy = true;
     _error = null;
