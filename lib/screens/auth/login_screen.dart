@@ -6,8 +6,6 @@ import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../apply/apply_screen.dart';
 import '../apply/application_status_screen.dart';
-import '../apply_center/apply_center_screen.dart';
-import '../apply_center/center_application_status_screen.dart';
 import '../home/home_shell.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/primary_button.dart';
@@ -33,6 +31,9 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscure = true;
   bool _busy = false;
   bool _rememberMe = false;
+  String? _errorMessage;
+
+  bool get _isLocked => _busy;
 
   @override
   void initState() {
@@ -64,10 +65,14 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _submit() async {
+    if (_busy) return; // Prevent duplicate submissions (button + keyboard).
     if (!_formKey.currentState!.validate()) return;
 
     FocusScope.of(context).unfocus();
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _errorMessage = null;
+    });
 
     final auth = context.read<AuthProvider>();
     final ok = await auth.login(
@@ -88,16 +93,28 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (!mounted) return;
-      Navigator.of(
-        context,
-      ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeShell()));
+      // Clear the whole stack so a deep-link / prior shell can never leave a
+      // duplicate HomeShell or a stale login route behind.
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomeShell()),
+        (route) => false,
+      );
     } else {
       if (!mounted) return;
-      final error = auth.error;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error ?? 'Login failed. Please try again.')),
-      );
+      // Inline, persistent error is more accessible than a fleeting SnackBar.
+      setState(() {
+        _errorMessage = _friendlyError(auth.error);
+      });
     }
+  }
+
+  String _friendlyError(String? error) {
+    final message = (error ?? '').trim();
+    if (message.isEmpty ||
+        message.toLowerCase().contains('something went wrong')) {
+      return 'Unable to log in. Check your credentials and connection, then try again.';
+    }
+    return message;
   }
 
   @override
@@ -161,63 +178,83 @@ class _LoginScreenState extends State<LoginScreen> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             // Email
-                            CustomTextField(
-                              controller: _emailController,
-                              label: 'EMAIL ADDRESS',
-                              hint: 'you@example.com',
-                              icon: Icons.email_outlined,
-                              keyboardType: TextInputType.emailAddress,
-                              focusNode: _emailFocus,
-                              autofillHints: const [AutofillHints.email],
-                              validator: (v) {
-                                if (v == null || v.trim().isEmpty) {
-                                  return 'Please enter your email.';
-                                }
-                                final emailRegex = RegExp(
-                                  r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
-                                );
-                                if (!emailRegex.hasMatch(v.trim())) {
-                                  return 'Please enter a valid email address.';
-                                }
-                                return null;
-                              },
-                              onFieldSubmitted: (_) =>
-                                  _passwordFocus.requestFocus(),
-                            ),
-                            const SizedBox(height: 20),
+                            AutofillGroup(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  CustomTextField(
+                                    controller: _emailController,
+                                    label: 'EMAIL ADDRESS',
+                                    hint: 'you@example.com',
+                                    icon: Icons.email_outlined,
+                                    keyboardType: TextInputType.emailAddress,
+                                    textInputAction: TextInputAction.next,
+                                    focusNode: _emailFocus,
+                                    enabled: !_isLocked,
+                                    autofillHints: const [
+                                      AutofillHints.username,
+                                      AutofillHints.email,
+                                    ],
+                                    validator: (v) {
+                                      if (v == null || v.trim().isEmpty) {
+                                        return 'Please enter your email.';
+                                      }
+                                      final emailRegex = RegExp(
+                                        r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+                                      );
+                                      if (!emailRegex.hasMatch(v.trim())) {
+                                        return 'Please enter a valid email address.';
+                                      }
+                                      return null;
+                                    },
+                                    onFieldSubmitted: (_) =>
+                                        _passwordFocus.requestFocus(),
+                                  ),
+                                  const SizedBox(height: 20),
 
-                            // Password
-                            CustomTextField(
-                              controller: _passwordController,
-                              label: 'PASSWORD',
-                              hint:
-                                  '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022',
-                              icon: Icons.lock_outline,
-                              obscure: _obscure,
-                              focusNode: _passwordFocus,
-                              suffix: IconButton(
-                                icon: Icon(
-                                  // Icon always mirrors the current state:
-                                  // slashed eye = hidden, open eye = visible.
-                                  _obscure
-                                      ? Icons.visibility_off_outlined
-                                      : Icons.visibility_outlined,
-                                  color: AppColors.textSecondary,
-                                  size: 20,
-                                ),
-                                onPressed: () =>
-                                    setState(() => _obscure = !_obscure),
+                                  // Password
+                                  CustomTextField(
+                                    controller: _passwordController,
+                                    label: 'PASSWORD',
+                                    hint:
+                                        '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022',
+                                    icon: Icons.lock_outline,
+                                    obscure: _obscure,
+                                    focusNode: _passwordFocus,
+                                    enabled: !_isLocked,
+                                    textInputAction: TextInputAction.done,
+                                    autofillHints: const [
+                                      AutofillHints.password,
+                                    ],
+                                    suffix: IconButton(
+                                      tooltip: _obscure
+                                          ? 'Show password'
+                                          : 'Hide password',
+                                      icon: Icon(
+                                        // Icon always mirrors the current state:
+                                        // slashed eye = hidden, open eye = visible.
+                                        _obscure
+                                            ? Icons.visibility_off_outlined
+                                            : Icons.visibility_outlined,
+                                        color: AppColors.textSecondary,
+                                        size: 20,
+                                      ),
+                                      onPressed: () =>
+                                          setState(() => _obscure = !_obscure),
+                                    ),
+                                    validator: (v) {
+                                      if (v == null || v.isEmpty) {
+                                        return 'Please enter your password.';
+                                      }
+                                      if (v.length < 6) {
+                                        return 'Password must be at least 6 characters.';
+                                      }
+                                      return null;
+                                    },
+                                    onFieldSubmitted: (_) => _submit(),
+                                  ),
+                                ],
                               ),
-                              validator: (v) {
-                                if (v == null || v.isEmpty) {
-                                  return 'Please enter your password.';
-                                }
-                                if (v.length < 6) {
-                                  return 'Password must be at least 6 characters.';
-                                }
-                                return null;
-                              },
-                              onFieldSubmitted: (_) => _submit(),
                             ),
                             const SizedBox(height: 8),
 
@@ -250,6 +287,45 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             const SizedBox(height: 20),
 
+                            // Inline login error (accessible, persistent)
+                            if (_errorMessage != null) ...[
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFF1E8),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: AppColors.warning.withValues(
+                                      alpha: 0.5,
+                                    ),
+                                  ),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Icon(
+                                      Icons.error_outline,
+                                      size: 20,
+                                      color: AppColors.warning,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        _errorMessage!,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          height: 1.4,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+
                             // Login button
                             PrimaryButton(
                               label: 'Sign in to Rider Center',
@@ -260,91 +336,53 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
 
-                    // ── Apply as a rider / check status ──
+                    // ── Apply as a rider / check application status ──
                     Row(
                       children: [
                         Expanded(
-                          child: OutlinedButton.icon(
+                          child: TextButton(
                             onPressed: () => Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (_) => const ApplyScreen(),
                               ),
                             ),
-                            icon: const Icon(
-                              Icons.person_add_outlined,
-                              size: 18,
-                            ),
-                            label: const Text('Apply as a Rider'),
-                            style: OutlinedButton.styleFrom(
+                            style: TextButton.styleFrom(
                               foregroundColor: AppTheme.primary,
-                              minimumSize: const Size.fromHeight(48),
-                              side: const BorderSide(color: AppTheme.primary),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                              textStyle: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
                               ),
+                            ),
+                            child: const Text(
+                              'Apply as a Rider',
+                              textAlign: TextAlign.center,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 8),
                         Expanded(
-                          child: OutlinedButton.icon(
+                          child: TextButton(
                             onPressed: () => Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (_) => const ApplicationStatusScreen(),
                               ),
                             ),
-                            icon: const Icon(
-                              Icons.manage_search_outlined,
-                              size: 18,
-                            ),
-                            label: const Text('Check Application Status'),
-                            style: OutlinedButton.styleFrom(
+                            style: TextButton.styleFrom(
                               foregroundColor: AppTheme.primary,
-                              minimumSize: const Size.fromHeight(48),
-                              side: const BorderSide(color: AppTheme.primary),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                              textStyle: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
                               ),
+                            ),
+                            child: const Text(
+                              'Check Application Status',
+                              textAlign: TextAlign.center,
                             ),
                           ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // ── Open a Logistics Center / check center status ──
-                    OutlinedButton.icon(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const ApplyCenterScreen(),
-                        ),
-                      ),
-                      icon: const Icon(Icons.storefront_outlined, size: 18),
-                      label: const Text('Open a Logistics Center'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.primary,
-                        minimumSize: const Size.fromHeight(48),
-                        side: const BorderSide(color: AppTheme.primary),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const CenterApplicationStatusScreen(),
-                        ),
-                      ),
-                      child: const Text(
-                        'Check a logistics center application status',
-                        style: TextStyle(
-                            color: AppTheme.primary,
-                            fontWeight: FontWeight.w600),
-                      ),
                     ),
                     const SizedBox(height: 24),
                   ],
@@ -366,7 +404,9 @@ class _CurvedHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final headerHeight = screenHeight * 0.28;
+    // Clamp the decorative header so short (landscape) and very tall screens
+    // both leave room for the form without forcing overflow.
+    final headerHeight = screenHeight.clamp(120.0, 260.0);
 
     return ClipRRect(
       borderRadius: const BorderRadius.only(

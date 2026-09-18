@@ -45,6 +45,24 @@ class DeliveryService {
         Map<String, dynamic>.from(data['delivery'] as Map? ?? {}));
   }
 
+  /// Find the rider's delivery by the tracking number scanned from an INVOIZ
+  /// shipping label (QR payload). The tracking number is the existing
+  /// delivery identifier — scanning never creates one.
+  ///
+  /// REQUIRED backend contract (rider API, Sanctum-authenticated):
+  /// `GET /rider/deliveries/lookup?tracking_number=TRK-...` returns
+  /// `200 {delivery: {...}}` using the same delivery payload shape as
+  /// [detail]. The backend must enforce the same rider-ownership rules as
+  /// [detail]: `404` when no delivery matches, `403` when the delivery
+  /// exists but this rider may not access it.
+  Future<Delivery> lookupByTracking(String trackingNumber) async {
+    final data = await _api.get('/rider/deliveries/lookup', query: {
+      'tracking_number': trackingNumber,
+    });
+    return Delivery.fromJson(
+        Map<String, dynamic>.from(data['delivery'] as Map? ?? {}));
+  }
+
   Future<Delivery> accept(int id) async {
     final data = await _api.post('/rider/deliveries/$id/accept');
     return Delivery.fromJson(

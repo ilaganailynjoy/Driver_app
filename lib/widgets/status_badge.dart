@@ -42,6 +42,10 @@ class StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = label ?? _defaultLabel(status);
     final color = colorFor(status);
+    // The amber accent alone on a pale fill is low-contrast; use a darker
+    // ink for the label so the status stays readable while keeping the dot
+    // in the accent color.
+    final ink = color == AppColors.secondary ? const Color(0xFF8A5A00) : color;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -61,7 +65,7 @@ class StatusBadge extends StatelessWidget {
           Text(
             text,
             style: TextStyle(
-              color: color,
+              color: ink,
               fontSize: 12,
               fontWeight: FontWeight.w700,
             ),

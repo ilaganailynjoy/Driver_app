@@ -6,6 +6,7 @@ import '../../providers/delivery_provider.dart';
 import '../../widgets/delivery_card.dart';
 import '../../widgets/error_widget.dart';
 import '../../widgets/loading_widget.dart';
+import '../scan/scan_parcel_screen.dart';
 import 'delivery_detail_screen.dart';
 
 /// Delivery list with status filter chips.
@@ -24,7 +25,18 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Deliveries'),
-        automaticallyImplyLeading: false,
+        // Back arrow only when this screen was pushed (e.g. from the
+        // dashboard); the bottom-nav tab instance stays root-level.
+        automaticallyImplyLeading: Navigator.of(context).canPop(),
+        actions: [
+          IconButton(
+            tooltip: 'Scan Parcel',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ScanParcelScreen()),
+            ),
+            icon: const Icon(Icons.qr_code_scanner_outlined),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -55,10 +67,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
     if (provider.deliveries.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        children: const [
-          SizedBox(height: 80),
-          _EmptyDeliveries(),
-        ],
+        children: const [SizedBox(height: 80), _EmptyDeliveries()],
       );
     }
 
@@ -77,7 +86,10 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
               ),
             );
           },
-          trailing: const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+          trailing: const Icon(
+            Icons.chevron_right,
+            color: AppColors.textSecondary,
+          ),
         );
       },
     );
@@ -127,7 +139,11 @@ class _EmptyDeliveries extends StatelessWidget {
     return const Column(
       children: [
         SizedBox(height: 40),
-        Icon(Icons.inventory_2_outlined, size: 56, color: AppColors.textSecondary),
+        Icon(
+          Icons.inventory_2_outlined,
+          size: 56,
+          color: AppColors.textSecondary,
+        ),
         SizedBox(height: 16),
         Text(
           'No deliveries here',

@@ -6,6 +6,7 @@ import '../../core/utils/format_utils.dart';
 import '../../models/delivery.dart';
 import '../../providers/delivery_provider.dart';
 import '../../providers/rider_provider.dart';
+import '../../services/rider_service.dart';
 import '../../widgets/dashboard_card.dart';
 import '../../widgets/delivery_card.dart';
 import '../../widgets/error_widget.dart';
@@ -37,17 +38,20 @@ class DashboardScreen extends StatelessWidget {
         child: riderProvider.loading && riderProvider.dashboard == null
             ? const LoadingWidget(label: 'Loading dashboard...')
             : riderProvider.error != null && riderProvider.dashboard == null
-                ? ErrorView(
-                    message: riderProvider.error!,
-                    onRetry: riderProvider.loadDashboard,
-                  )
-                : _buildContent(context, riderProvider, deliveryProvider),
+            ? ErrorView(
+                message: riderProvider.error!,
+                onRetry: riderProvider.loadDashboard,
+              )
+            : _buildContent(context, riderProvider, deliveryProvider),
       ),
     );
   }
 
-  Widget _buildContent(BuildContext context, RiderProvider riderProvider,
-      DeliveryProvider deliveryProvider) {
+  Widget _buildContent(
+    BuildContext context,
+    RiderProvider riderProvider,
+    DeliveryProvider deliveryProvider,
+  ) {
     final dashboard = riderProvider.dashboard;
     final rider = dashboard?.rider ?? riderProvider.rider;
 
@@ -121,6 +125,10 @@ class DashboardScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 20),
+        if (_isEmptyDashboard(dashboard)) ...[
+          const _NoActiveDeliveries(),
+          const SizedBox(height: 16),
+        ],
         _EarningsBanner(
           amount: dashboard?.todayEarnings ?? 0,
           onTap: () => _openEarnings(context),
@@ -135,7 +143,10 @@ class DashboardScreen extends StatelessWidget {
           DeliveryCard(
             delivery: dashboard!.currentDelivery!,
             onTap: () => _openDelivery(context, dashboard.currentDelivery!),
-            trailing: const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+            trailing: const Icon(
+              Icons.chevron_right,
+              color: AppColors.textSecondary,
+            ),
           ),
           const SizedBox(height: 8),
         ],
@@ -148,7 +159,10 @@ class DashboardScreen extends StatelessWidget {
           DeliveryCard(
             delivery: dashboard!.upcomingPickup!,
             onTap: () => _openDelivery(context, dashboard.upcomingPickup!),
-            trailing: const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+            trailing: const Icon(
+              Icons.chevron_right,
+              color: AppColors.textSecondary,
+            ),
           ),
           const SizedBox(height: 8),
         ],
@@ -158,12 +172,16 @@ class DashboardScreen extends StatelessWidget {
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 12),
-          ...dashboard.recentCompleted.take(3).map(
+          ...dashboard.recentCompleted
+              .take(3)
+              .map(
                 (d) => DeliveryCard(
                   delivery: d,
                   onTap: () => _openDelivery(context, d),
-                  trailing: const Icon(Icons.chevron_right,
-                      color: AppColors.textSecondary),
+                  trailing: const Icon(
+                    Icons.chevron_right,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ),
         ],
@@ -178,15 +196,31 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
+  bool _isEmptyDashboard(DashboardSummary? dashboard) {
+    if (dashboard == null) return false;
+    final stats = dashboard.stats;
+    final anyStats = [
+      'assigned',
+      'to_pick_up',
+      'in_transit',
+      'completed',
+    ].any((k) => (stats[k] ?? 0) > 0);
+    return !anyStats &&
+        dashboard.currentDelivery == null &&
+        dashboard.upcomingPickup == null &&
+        dashboard.recentCompleted.isEmpty;
+  }
+
   void _goToDeliveriesTab(BuildContext context) {
-    Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => const DeliveriesScreen()));
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const DeliveriesScreen()));
   }
 
   void _openEarnings(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const EarningsScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const EarningsScreen()));
   }
 
   void _goToFiltered(BuildContext context, String filter) {
@@ -241,28 +275,25 @@ class _Header extends StatelessWidget {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    isOnline ? 'You are ONLINE' : 'You are OFFLINE',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color:
-                          isOnline ? AppTheme.success : AppColors.textSecondary,
-                    ),
-                  ),
+                  const SizedBox(height: 4),
+                  _StatusPill(isOnline: isOnline),
                 ],
               ),
             ),
-            Switch(
-              value: isOnline,
-              onChanged: busy ? null : (_) => onToggle(),
-              activeThumbColor: Colors.white,
-              activeTrackColor: AppTheme.success,
+            Semantics(
+              label: busy
+                  ? 'Updating availability'
+                  : (isOnline ? 'Go offline' : 'Go online'),
+              child: Switch(
+                value: isOnline,
+                onChanged: busy ? null : (_) => onToggle(),
+                activeThumbColor: Colors.white,
+                activeTrackColor: AppTheme.success,
+              ),
             ),
           ],
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         Padding(
           padding: const EdgeInsets.only(left: 2),
           child: Text(
@@ -272,10 +303,110 @@ class _Header extends StatelessWidget {
             style: const TextStyle(
               fontSize: 12,
               color: AppColors.textSecondary,
+              height: 1.4,
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Explicit online/offline indicator: icon + text + color, so status is never
+/// communicated by color alone. Broadcasts to screen readers on change.
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.isOnline});
+
+  final bool isOnline;
+
+  @override
+  Widget build(BuildContext context) {
+    final online = isOnline;
+    return Semantics(
+      liveRegion: true,
+      label: online ? 'You are online' : 'You are offline',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: (online ? AppTheme.success : AppColors.textSecondary)
+              .withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              online ? Icons.power_outlined : Icons.power_off_outlined,
+              size: 14,
+              color: online ? AppTheme.success : AppColors.textSecondary,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              online ? 'ONLINE' : 'OFFLINE',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.4,
+                color: online ? AppTheme.success : AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Friendly card shown when there is nothing to deliver right now.
+class _NoActiveDeliveries extends StatelessWidget {
+  const _NoActiveDeliveries();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.inventory_2_outlined,
+              color: AppTheme.primary,
+            ),
+          ),
+          const SizedBox(width: 14),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'No active deliveries',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'New assignments will appear here.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
