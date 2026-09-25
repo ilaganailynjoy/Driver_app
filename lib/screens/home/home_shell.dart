@@ -14,11 +14,19 @@ import '../../services/location_service.dart';
 import '../auth/login_screen.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../deliveries/deliveries_screen.dart';
-import '../messages/messages_screen.dart';
+import '../messages/conversations_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
+import '../scan/scan_parcel_screen.dart';
+import '../settings/settings_screen.dart';
+import '../../widgets/liquid_nav_bar.dart';
 
 /// Bottom-navigation shell for the rider app.
+///
+/// The floating liquid-glass dock holds Home, Deliveries, a prominent Scan
+/// action and Settings. Scan opens as a pushed route (never a tab) so the
+/// scanner keeps its single-shot pushReplacement flow. Messages lives in
+/// the top bar, left of the notifications icon.
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
@@ -27,15 +35,19 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
-  int _index = 0;
+  /// Active dock slot: 0 = Home, 1 = Deliveries, 3 = Settings, 4 = Profile.
+  /// Slot 2 (Scan) is an action and never becomes the selection.
+  int _tab = 0;
   Timer? _locationTimer;
 
   static const _screens = [
     DashboardScreen(),
     DeliveriesScreen(),
-    MessagesScreen(),
+    SettingsScreen(),
     ProfileScreen(),
   ];
+
+  int get _screenIndex => _tab == 3 ? 2 : (_tab == 4 ? 3 : _tab);
 
   @override
   void initState() {
@@ -97,12 +109,33 @@ class _HomeShellState extends State<HomeShell> {
     });
   }
 
+  void _onDockTap(int slot) {
+    if (slot == 2) {
+      // Scan is an action: open the scanner without changing tabs so its
+      // single-shot flow (pushReplacement to delivery detail) is preserved.
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const ScanParcelScreen()),
+      );
+      return;
+    }
+    if (slot == 1) context.read<DeliveryProvider>().load();
+    setState(() => _tab = slot);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBody: true,
       appBar: AppBar(
         title: const Text('Invoiz Rider'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.chat_bubble_outline),
+            tooltip: 'Messages',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ConversationsScreen()),
+            ),
+          ),
           Consumer<NotificationProvider>(
             builder: (_, p, _) => Stack(
               children: [
@@ -122,35 +155,17 @@ class _HomeShellState extends State<HomeShell> {
           ),
         ],
       ),
-      body: IndexedStack(index: _index, children: _screens),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) {
-          if (i == 1) context.read<DeliveryProvider>().load();
-          setState(() => _index = i);
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.inventory_2_outlined),
-            selectedIcon: Icon(Icons.inventory_2),
-            label: 'Deliveries',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
-            selectedIcon: Icon(Icons.chat_bubble),
-            label: 'Messages',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
+      body: Padding(
+        // Clearance so tab content never hides under the floating dock.
+        padding: const EdgeInsets.only(bottom: 92),
+        child: IndexedStack(index: _screenIndex, children: _screens),
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: LiquidNavBar(
+          selectedIndex: _tab,
+          onTap: _onDockTap,
+        ),
       ),
     );
   }

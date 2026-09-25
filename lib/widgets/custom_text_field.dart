@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';
 
-/// Reusable rounded text field with prefix icon, optional suffix, and label.
+/// Reusable rounded text field with optional prefix icon, suffix, and label.
 class CustomTextField extends StatelessWidget {
   const CustomTextField({
     super.key,
     required this.controller,
     required this.label,
     required this.hint,
-    required this.icon,
+    this.icon,
     this.obscure = false,
     this.suffix,
     this.keyboardType,
@@ -24,7 +24,7 @@ class CustomTextField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
   final String hint;
-  final IconData icon;
+  final IconData? icon;
   final bool obscure;
   final Widget? suffix;
   final TextInputType? keyboardType;
@@ -67,7 +67,9 @@ class CustomTextField extends StatelessWidget {
               color: AppColors.textSecondary.withValues(alpha: 0.7),
               fontSize: 14,
             ),
-            prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 20),
+            prefixIcon: icon == null
+                ? null
+                : Icon(icon, color: AppColors.textSecondary, size: 20),
             suffixIcon: suffix,
             filled: true,
             fillColor: AppColors.surfaceSoft,

@@ -4,18 +4,24 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:invoize_rider/core/network/api_client.dart';
-import 'package:invoize_rider/core/storage/token_storage.dart';
-import 'package:invoize_rider/providers/auth_provider.dart';
-import 'package:invoize_rider/providers/delivery_provider.dart';
-import 'package:invoize_rider/providers/rider_provider.dart';
-import 'package:invoize_rider/screens/auth/login_screen.dart';
-import 'package:invoize_rider/screens/dashboard/dashboard_screen.dart';
-import 'package:invoize_rider/services/delivery_service.dart';
-import 'package:invoize_rider/services/rider_service.dart';
-import 'package:invoize_rider/widgets/primary_button.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+// ignore_for_file: avoid_relative_lib_imports
+// Relative first-party imports are intentional: the generated package
+// config in this checkout drops the root package entry whenever the tool
+// regenerates it, which breaks package: self-imports for the analyzer and
+// test runner. Third-party package: imports resolve normally.
+import '../lib/core/network/api_client.dart';
+import '../lib/core/storage/token_storage.dart';
+import '../lib/providers/auth_provider.dart';
+import '../lib/providers/delivery_provider.dart';
+import '../lib/providers/rider_provider.dart';
+import '../lib/screens/auth/login_screen.dart';
+import '../lib/screens/dashboard/dashboard_screen.dart';
+import '../lib/services/delivery_service.dart';
+import '../lib/services/rider_service.dart';
+import '../lib/widgets/primary_button.dart';
 
 /// Stub HTTP client so login can be exercised without a server.
 class _StubClient extends http.BaseClient {
@@ -85,7 +91,7 @@ void main() {
 
           expect(tester.takeException(), isNull);
           expect(find.text('Rider Login'), findsOneWidget);
-          expect(find.text('Sign in to Rider Center'), findsOneWidget);
+          expect(find.text('Sign In'), findsOneWidget);
         },
       );
     }
@@ -93,29 +99,26 @@ void main() {
 
   group('Rider secondary actions', () {
     for (final width in [320.0, 360.0, 375.0, 412.0]) {
-      testWidgets('borderless actions share one row at ${width.toInt()}px', (
+      testWidgets('apply sits below sign in and status check lives outside the card at ${width.toInt()}px', (
         tester,
       ) async {
         _setSurface(tester, width, 800);
         await _pumpLogin(tester, _StubClient());
 
-        expect(find.byType(TextButton), findsNWidgets(2));
-        expect(find.byType(OutlinedButton), findsNothing);
+        expect(find.text('Forgot password?'), findsOneWidget);
         expect(find.text('Apply as a Rider'), findsOneWidget);
         expect(find.text('Check Application Status'), findsOneWidget);
+        expect(find.byType(OutlinedButton), findsNWidgets(2));
 
-        // Both actions sit on the same horizontal line (single Row).
-        final rowOfActions = find.ancestor(
-          of: find.text('Check Application Status'),
-          matching: find.byType(Row),
-        );
-        expect(
-          find.descendant(
-            of: rowOfActions,
-            matching: find.text('Apply as a Rider'),
-          ),
-          findsOneWidget,
-        );
+        // Vertical order on the page: Sign In, then Apply, then the
+        // outside-the-card Check Application Status action.
+        final signInDy = tester.getCenter(find.text('Sign In')).dy;
+        final applyDy =
+            tester.getCenter(find.text('Apply as a Rider')).dy;
+        final statusDy =
+            tester.getCenter(find.text('Check Application Status')).dy;
+        expect(applyDy, greaterThan(signInDy));
+        expect(statusDy, greaterThan(applyDy));
 
         await tester.fling(
           find.byType(SingleChildScrollView),
@@ -127,6 +130,27 @@ void main() {
       });
     }
 
+    testWidgets('forgot password explains the logistics resend flow', (
+      tester,
+    ) async {
+      _setSurface(tester, 390, 844);
+      await _pumpLogin(tester, _StubClient());
+
+      await tester.tap(find.text('Forgot password?'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Forgot password?'), findsWidgets);
+      expect(
+        find.textContaining('resend your login'),
+        findsOneWidget,
+      );
+      expect(find.text('Close'), findsOneWidget);
+
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('resend your login'), findsNothing);
+    });
+
     testWidgets('keeps the primary submit button visually dominant', (
       tester,
     ) async {
@@ -135,15 +159,15 @@ void main() {
 
       final submit = find.widgetWithText(
         ElevatedButton,
-        'Sign in to Rider Center',
+        'Sign In',
       );
       final submitHeight = tester.getSize(submit).height;
 
-      // Full-height (52px) filled button vs. compact borderless TextButtons —
+      // Full-height (52px) filled button vs. compact secondary actions —
       // the primary action must stay the largest element on the page.
       expect(submitHeight, greaterThanOrEqualTo(52));
       expect(submitHeight, greaterThan(40));
-      expect(find.byType(TextButton), findsNWidgets(2));
+      expect(find.text('Forgot password?'), findsOneWidget);
     });
 
     testWidgets('Logistics Center actions are not exposed on Rider login', (
@@ -169,7 +193,7 @@ void main() {
       _setSurface(tester, 390, 844);
       await _pumpLogin(tester, _StubClient());
 
-      await tester.tap(find.text('Sign in to Rider Center'));
+      await tester.tap(find.text('Sign In'));
       await tester.pumpAndSettle();
 
       expect(find.text('Please enter your email.'), findsOneWidget);
@@ -184,7 +208,7 @@ void main() {
 
       await tester.enterText(find.byType(TextField).at(0), 'not-an-email');
       await tester.enterText(find.byType(TextField).at(1), '123');
-      await tester.tap(find.text('Sign in to Rider Center'));
+      await tester.tap(find.text('Sign In'));
       await tester.pumpAndSettle();
 
       expect(find.text('Please enter a valid email address.'), findsOneWidget);
@@ -209,7 +233,7 @@ void main() {
 
       await tester.enterText(find.byType(TextField).at(0), 'rider@invoiz.test');
       await tester.enterText(find.byType(TextField).at(1), 'password123');
-      await tester.tap(find.text('Sign in to Rider Center'));
+      await tester.tap(find.text('Sign In'));
       await tester.pump();
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
       await tester.tap(find.byType(PrimaryButton), warnIfMissed: false);
@@ -234,7 +258,7 @@ void main() {
 
       await tester.enterText(find.byType(TextField).at(0), 'rider@invoiz.test');
       await tester.enterText(find.byType(TextField).at(1), 'password123');
-      await tester.tap(find.text('Sign in to Rider Center'));
+      await tester.tap(find.text('Sign In'));
       await tester.pumpAndSettle();
 
       expect(find.text('Invalid credentials.'), findsOneWidget);
@@ -253,10 +277,55 @@ void main() {
 
       await tester.enterText(find.byType(TextField).at(0), 'rider@invoiz.test');
       await tester.enterText(find.byType(TextField).at(1), 'password123');
-      await tester.tap(find.text('Sign in to Rider Center'));
+      await tester.tap(find.text('Sign In'));
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Unable to log in'), findsOneWidget);
+    });
+  });
+
+  group('Small-phone layout', () {
+    testWidgets('everything reachable with scrolling and no overflow on a small phone', (
+      tester,
+    ) async {
+      _setSurface(tester, 360, 640);
+      await _pumpLogin(tester, _StubClient());
+
+      // With the fuller card, small phones scroll; the scroll view must
+      // still expose every action with no overflow.
+      final scrollable = tester.widget<SingleChildScrollView>(
+        find.byType(SingleChildScrollView),
+      );
+      expect(scrollable.physics, isA<AlwaysScrollableScrollPhysics>());
+
+      await tester.fling(
+        find.byType(SingleChildScrollView),
+        const Offset(0, -1200),
+        2500,
+      );
+      await tester.pumpAndSettle();
+
+      // Header, form, submit, and all secondary actions are reachable
+      // with no overflow.
+      expect(find.text('Rider Login'), findsWidgets);
+      expect(find.text('Sign In'), findsOneWidget);
+      expect(find.text('Forgot password?'), findsOneWidget);
+      expect(find.text('Apply as a Rider'), findsOneWidget);
+      expect(find.text('Check Application Status'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('input boxes have no decorative prefix icons', (
+      tester,
+    ) async {
+      _setSurface(tester, 390, 844);
+      await _pumpLogin(tester, _StubClient());
+
+      expect(find.byIcon(Icons.email_outlined), findsNothing);
+      expect(find.byIcon(Icons.lock_outline), findsNothing);
+
+      // The functional show/hide password toggle is preserved.
+      expect(find.byIcon(Icons.visibility_off_outlined), findsOneWidget);
     });
   });
 

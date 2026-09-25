@@ -1,4 +1,4 @@
-import '../../core/network/api_client.dart';
+import '../core/network/api_client.dart';
 
 /// Philippine Standard Geographic Code (PSGC) option row: id + name.
 /// All three levels share the same shape.

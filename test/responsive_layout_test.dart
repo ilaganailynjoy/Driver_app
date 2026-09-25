@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:invoize_rider/screens/apply/application_status_screen.dart';
-import 'package:invoize_rider/screens/apply/apply_screen.dart';
+
+// ignore_for_file: avoid_relative_lib_imports
+// (Same checkout-wide package-config note as the other runnable tests.)
+import '../lib/screens/apply/application_status_screen.dart';
+import '../lib/screens/apply/apply_screen.dart';
 
 /// Responsive smoke test: the apply wizard and status screen must lay out
 /// without overflow or clipped-content exceptions at common phone widths

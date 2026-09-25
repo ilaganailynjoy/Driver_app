@@ -5,8 +5,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:invoize_rider/core/network/api_client.dart';
-import 'package:invoize_rider/screens/apply/apply_screen.dart';
+
+// ignore_for_file: avoid_relative_lib_imports
+// (Same checkout-wide package-config note as the other runnable tests.)
+import '../lib/core/network/api_client.dart';
+import '../lib/screens/apply/apply_screen.dart';
 
 /// Backend for the RIDER apply wizard: email OTP + PSGC address data.
 /// Vehicle types fall back to the built-in list when the endpoint 404s.

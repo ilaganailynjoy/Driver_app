@@ -6,7 +6,9 @@ plugins {
 
 android {
     namespace = "com.invoize.invoize_rider"
-    compileSdk = flutter.compileSdkVersion
+    // permission_handler_android requires compiling against API 37+.
+    // compileSdk is backward compatible: the app still runs on older devices.
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

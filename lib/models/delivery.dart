@@ -34,6 +34,8 @@ class Delivery {
     this.sortingCenterHandoffRiderId,
     this.sortingCenterPickupAt,
     this.sortingCenterPickupRiderId,
+    this.handlingCenterName,
+    this.destinationCenterName,
   });
 
   final int id;
@@ -65,6 +67,12 @@ class Delivery {
   final int? sortingCenterHandoffRiderId;
   final DateTime? sortingCenterPickupAt;
   final int? sortingCenterPickupRiderId;
+
+  /// Origin/handling center name when the backend includes it. Shown in
+  /// sorting-center confirmations so the rider knows which center holds
+  /// the parcel. Null when the payload omits the center objects.
+  final String? handlingCenterName;
+  final String? destinationCenterName;
 
   bool get isCashOnDelivery => paymentMethod == 'cash_on_delivery';
 
@@ -171,6 +179,15 @@ class Delivery {
       sortingCenterPickupAt: _parseDate(json['sorting_center_pickup_at']),
       sortingCenterPickupRiderId:
           (json['sorting_center_pickup_rider_id'] as num?)?.toInt(),
+      handlingCenterName: (json['logistics_center'] is Map<String, dynamic>)
+          ? (json['logistics_center'] as Map<String, dynamic>)['name']
+              as String?
+          : null,
+      destinationCenterName:
+          (json['destination_center'] is Map<String, dynamic>)
+              ? (json['destination_center'] as Map<String, dynamic>)['name']
+                  as String?
+              : null,
     );
   }
 
@@ -210,6 +227,8 @@ class Delivery {
       sortingCenterHandoffRiderId: sortingCenterHandoffRiderId,
       sortingCenterPickupAt: sortingCenterPickupAt,
       sortingCenterPickupRiderId: sortingCenterPickupRiderId,
+      handlingCenterName: handlingCenterName,
+      destinationCenterName: destinationCenterName,
     );
   }
 }

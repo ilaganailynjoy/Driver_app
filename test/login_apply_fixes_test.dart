@@ -2,11 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:invoize_rider/core/network/api_client.dart';
-import 'package:invoize_rider/core/storage/token_storage.dart';
-import 'package:invoize_rider/providers/auth_provider.dart';
-import 'package:invoize_rider/screens/apply/apply_screen.dart';
-import 'package:invoize_rider/screens/auth/login_screen.dart';
+
+// ignore_for_file: avoid_relative_lib_imports
+// Relative first-party imports are intentional: the generated package
+// config in this checkout drops the root package entry whenever the tool
+// regenerates it, which breaks package: self-imports for the analyzer and
+// test runner. Third-party package: imports resolve normally.
+import '../lib/core/network/api_client.dart';
+import '../lib/core/storage/token_storage.dart';
+import '../lib/providers/auth_provider.dart';
+import '../lib/screens/apply/apply_screen.dart';
+import '../lib/screens/auth/login_screen.dart';
 
 /// Focused tests for: password eye toggle, supported attachment formats,
 /// and removal of the login helper text.
@@ -78,7 +84,7 @@ void main() {
     testWidgets('login actions remain intact', (tester) async {
       await pumpLogin(tester);
       expect(find.text('Rider Login'), findsOneWidget);
-      expect(find.text('Sign in to Rider Center'), findsOneWidget);
+      expect(find.text('Sign In'), findsOneWidget);
       expect(find.text('Apply as a Rider'), findsOneWidget);
       expect(find.text('Check Application Status'), findsOneWidget);
     });

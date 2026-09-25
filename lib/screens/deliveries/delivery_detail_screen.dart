@@ -470,32 +470,15 @@ class _ActionBar extends StatelessWidget {
     // Already handed over — pickup rider's job is done; wait for center.
     if (delivery.status == 'picked_up' &&
         delivery.sortingCenterHandoffAt != null) {
+      final handoffCenter = delivery.handlingCenterName;
       return SafeArea(
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppColors.success.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
-              border:
-                  Border.all(color: AppColors.success.withValues(alpha: 0.18)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.check_circle_outline,
-                    size: 18, color: AppColors.success),
-                SizedBox(width: 8),
-                Text('Parcel handed over to sorting center.',
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.success)),
-              ],
-            ),
+          child: _custodyBanner(
+            handoffCenter != null && handoffCenter.isNotEmpty
+                ? 'Parcel handed over to $handoffCenter.'
+                : 'Parcel handed over to sorting center.',
           ),
         ),
       );
@@ -571,26 +554,79 @@ class _ActionBar extends StatelessWidget {
 
     final action = _nextAction(delivery.status);
 
+    // Collected from the center — persistent confirmation that the parcel
+    // is back in rider custody. The generic flow (e.g. Accept) continues
+    // underneath.
+    final pickupCenter = delivery.destinationCenterName?.isNotEmpty == true
+        ? delivery.destinationCenterName
+        : delivery.handlingCenterName;
+    final showPickupConfirm =
+        (delivery.status == 'assigned' || delivery.status == 'accepted') &&
+            delivery.sortingCenterPickupAt != null;
+
     return SafeArea(
       top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-        child: ElevatedButton.icon(
-          onPressed: busy
-              ? null
-              : () => _onAction(context),
-          icon: busy
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: Colors.white,
-                  ),
-                )
-              : Icon(action.icon, size: 20),
-          label: Text(busy ? 'Working...' : action.label),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (showPickupConfirm) ...[
+              _custodyBanner(
+                pickupCenter != null && pickupCenter.isNotEmpty
+                    ? 'Parcel picked up from $pickupCenter — ready for delivery.'
+                    : 'Parcel picked up from sorting center — ready for delivery.',
+              ),
+              const SizedBox(height: 8),
+            ],
+            ElevatedButton.icon(
+              onPressed: busy
+                  ? null
+                  : () => _onAction(context),
+              icon: busy
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Icon(action.icon, size: 20),
+              label: Text(busy ? 'Working...' : action.label),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  /// Shared green confirmation chip for sorting-center custody states.
+  /// Callers provide the outer SafeArea/insets.
+  Widget _custodyBanner(String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.success.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.success.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.check_circle_outline,
+              size: 18, color: AppColors.success),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.success)),
+          ),
+        ],
       ),
     );
   }

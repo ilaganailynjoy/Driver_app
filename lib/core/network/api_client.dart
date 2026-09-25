@@ -87,6 +87,13 @@ class ApiClient {
     return _decode(response);
   }
 
+  Future<dynamic> delete(String path) async {
+    final response = await _guard(
+      () => _client.delete(_uri(path), headers: _headers()).timeout(_timeout),
+    );
+    return _decode(response);
+  }
+
   /// Multipart upload (used for proof-of-delivery photos). [fileBytes] are
   /// read by the caller so this works on every platform.
   Future<dynamic> postMultipart(

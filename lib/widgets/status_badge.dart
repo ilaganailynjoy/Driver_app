@@ -80,7 +80,7 @@ class StatusBadge extends StatelessWidget {
       case 'waiting_for_rider':
         return 'Waiting for Rider';
       case 'assigned':
-        return 'New Assignment';
+        return 'Assigned';
       case 'accepted':
         return 'Accepted';
       case 'going_to_pickup':

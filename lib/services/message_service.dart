@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import '../core/network/api_client.dart';
+import '../models/conversation.dart';
 
 class RiderMessage {
   const RiderMessage({
@@ -115,5 +116,60 @@ class MessageService {
     }
     final data = await _api.post('/rider/messages', body: {'body': body});
     return RiderMessage.fromJson(Map<String, dynamic>.from(data['data'] as Map));
+  }
+
+  /// Inbox threads auto-discovered from the rider's real relationships
+  /// (support + per-delivery buyer/seller threads). No recipient picking.
+  Future<ConversationPage> listConversations({String? search, int page = 1}) async {
+    final query = <String, dynamic>{'page': page.toString()};
+    if (search != null && search.trim().isNotEmpty) {
+      query['search'] = search.trim();
+    }
+    final data = await _api.get('/rider/conversations', query: query);
+    final list = data['conversations'] as List? ?? [];
+    final threads = list
+        .whereType<Map<String, dynamic>>()
+        .map(ConversationThread.fromJson)
+        .toList();
+    final pagination = data['pagination'] as Map<String, dynamic>?;
+    final current = (pagination?['current_page'] as num?)?.toInt() ?? 1;
+    final last = (pagination?['last_page'] as num?)?.toInt() ?? 1;
+    return ConversationPage(threads: threads, hasMore: current < last);
+  }
+
+  /// One thread's messages (API returns newest-first; callers display
+  /// chronologically). Opening marks the thread read server-side.
+  Future<ThreadMessages> getThread(int id, {int page = 1}) async {
+    final data = await _api.get('/rider/conversations/$id', query: {'page': page.toString()});
+    final list = data['messages'] as List? ?? [];
+    final pagination = data['pagination'] as Map<String, dynamic>?;
+    return ThreadMessages(
+      messages: list.whereType<Map<String, dynamic>>().toList(),
+      currentPage: (pagination?['current_page'] as num?)?.toInt() ?? 1,
+      lastPage: (pagination?['last_page'] as num?)?.toInt() ?? 1,
+    );
+  }
+
+  /// Send into a specific thread. Returns the created message payload.
+  Future<Map<String, dynamic>> sendToThread(int id,
+      {required String body, Uint8List? fileBytes, String? filename}) async {
+    if (fileBytes != null && filename != null) {
+      final data = await _api.postMultipart('/rider/conversations/$id/messages',
+          fileField: 'attachment', fileBytes: fileBytes, filename: filename, fields: {'body': body});
+      return Map<String, dynamic>.from(data['data'] as Map);
+    }
+    final data = await _api.post('/rider/conversations/$id/messages', body: {'body': body});
+    return Map<String, dynamic>.from(data['data'] as Map);
+  }
+
+  /// Edit own message in a thread (server enforces ownership).
+  Future<void> editThreadMessage(int threadId, int messageId, String body) async {
+    await _api.patch('/rider/conversations/$threadId/messages/$messageId',
+        body: {'body': body});
+  }
+
+  /// Soft-delete own message in a thread (server enforces ownership).
+  Future<void> deleteThreadMessage(int threadId, int messageId) async {
+    await _api.delete('/rider/conversations/$threadId/messages/$messageId');
   }
 }

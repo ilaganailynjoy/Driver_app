@@ -28,6 +28,10 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailFocus = FocusNode();
   final _passwordFocus = FocusNode();
 
+  static const _belowHeaderEstimate = 575.0;
+  static const _minHeader = 132.0;
+  static const _maxHeader = 230.0;
+
   bool _obscure = true;
   bool _busy = false;
   bool _rememberMe = false;
@@ -117,279 +121,453 @@ class _LoginScreenState extends State<LoginScreen> {
     return message;
   }
 
+  /// Rider logins have no self-service reset: credentials are issued and
+  /// managed by INVOIZ Logistics, so the sheet directs riders to message
+  /// logistics for replacement credentials (or to the application flow).
+  void _showForgotPassword() {
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Forgot password?',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Rider accounts are created and managed by INVOIZ '
+                'Logistics. Message us and we will resend your login '
+                'credentials.',
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.5,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              PrimaryButton(
+                label: 'Check Application Status',
+                onPressed: () {
+                  Navigator.of(sheetContext).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ApplicationStatusScreen(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton(
+                onPressed: () {
+                  Navigator.of(sheetContext).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ApplyScreen(),
+                    ),
+                  );
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.primary,
+                  side: const BorderSide(color: AppTheme.primary),
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                child: const Text('Apply as a Rider'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(sheetContext).pop(),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.textSecondary,
+                ),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
+    // The page fits on one screen: scrolling is disabled unless the
+    // keyboard is open (when it is needed to avoid overflow).
+    final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: SingleChildScrollView(
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          child: Column(
-            children: [
-              // ── Curved teal header ──
-              _CurvedHeader(screenHeight: screenHeight),
-              const SizedBox(height: 28),
-
-              // ── Login intro ──
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // The teal header absorbs leftover vertical space so it fills
+            // the screen on typical phones, while staying compact on small
+            // ones. _belowHeaderEstimate covers the intro, card, and links
+            // below it. Very short screens (e.g. landscape) fall back to
+            // scrolling rather than overflowing.
+            final fitsOnePage =
+                constraints.maxHeight >= _belowHeaderEstimate + _minHeader;
+            final headerHeight = fitsOnePage
+                ? (constraints.maxHeight - _belowHeaderEstimate).clamp(
+                    _minHeader,
+                    _maxHeader,
+                  )
+                : _minHeader;
+            return SingleChildScrollView(
+              physics: (keyboardOpen || !fitsOnePage)
+                  ? const AlwaysScrollableScrollPhysics()
+                  : const NeverScrollableScrollPhysics(),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Rider Login',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Sign in with your approved Invoiz rider account.',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textSecondary,
-                        height: 1.5,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
+                    // ── Curved teal header ──
+                    _CurvedHeader(height: headerHeight),
+                    const SizedBox(height: 14),
 
-                    // ── Login card ──
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: AppColors.border, width: 1),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 16,
-                            offset: const Offset(0, 4),
+                    // ── Login intro ──
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Rider Login',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
-                        ],
-                      ),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Email
-                            AutofillGroup(
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Sign in with your approved Invoiz rider account.',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppColors.textSecondary,
+                              height: 1.4,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+
+                          // ── Login card ──
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: AppColors.border,
+                                width: 1,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.04),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Form(
+                              key: _formKey,
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  CustomTextField(
-                                    controller: _emailController,
-                                    label: 'EMAIL ADDRESS',
-                                    hint: 'you@example.com',
-                                    icon: Icons.email_outlined,
-                                    keyboardType: TextInputType.emailAddress,
-                                    textInputAction: TextInputAction.next,
-                                    focusNode: _emailFocus,
-                                    enabled: !_isLocked,
-                                    autofillHints: const [
-                                      AutofillHints.username,
-                                      AutofillHints.email,
-                                    ],
-                                    validator: (v) {
-                                      if (v == null || v.trim().isEmpty) {
-                                        return 'Please enter your email.';
-                                      }
-                                      final emailRegex = RegExp(
-                                        r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
-                                      );
-                                      if (!emailRegex.hasMatch(v.trim())) {
-                                        return 'Please enter a valid email address.';
-                                      }
-                                      return null;
-                                    },
-                                    onFieldSubmitted: (_) =>
-                                        _passwordFocus.requestFocus(),
-                                  ),
-                                  const SizedBox(height: 20),
+                                  // Email
+                                  AutofillGroup(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        CustomTextField(
+                                          controller: _emailController,
+                                          label: 'EMAIL ADDRESS',
+                                          hint: 'you@example.com',
+                                          keyboardType:
+                                              TextInputType.emailAddress,
+                                          textInputAction: TextInputAction.next,
+                                          focusNode: _emailFocus,
+                                          enabled: !_isLocked,
+                                          autofillHints: const [
+                                            AutofillHints.username,
+                                            AutofillHints.email,
+                                          ],
+                                          validator: (v) {
+                                            if (v == null || v.trim().isEmpty) {
+                                              return 'Please enter your email.';
+                                            }
+                                            final emailRegex = RegExp(
+                                              r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+                                            );
+                                            if (!emailRegex.hasMatch(
+                                              v.trim(),
+                                            )) {
+                                              return 'Please enter a valid email address.';
+                                            }
+                                            return null;
+                                          },
+                                          onFieldSubmitted: (_) =>
+                                              _passwordFocus.requestFocus(),
+                                        ),
+                                        const SizedBox(height: 12),
 
-                                  // Password
-                                  CustomTextField(
-                                    controller: _passwordController,
-                                    label: 'PASSWORD',
-                                    hint:
-                                        '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022',
-                                    icon: Icons.lock_outline,
-                                    obscure: _obscure,
-                                    focusNode: _passwordFocus,
-                                    enabled: !_isLocked,
-                                    textInputAction: TextInputAction.done,
-                                    autofillHints: const [
-                                      AutofillHints.password,
-                                    ],
-                                    suffix: IconButton(
-                                      tooltip: _obscure
-                                          ? 'Show password'
-                                          : 'Hide password',
-                                      icon: Icon(
-                                        // Icon always mirrors the current state:
-                                        // slashed eye = hidden, open eye = visible.
-                                        _obscure
-                                            ? Icons.visibility_off_outlined
-                                            : Icons.visibility_outlined,
-                                        color: AppColors.textSecondary,
-                                        size: 20,
-                                      ),
-                                      onPressed: () =>
-                                          setState(() => _obscure = !_obscure),
+                                        // Password
+                                        CustomTextField(
+                                          controller: _passwordController,
+                                          label: 'PASSWORD',
+                                          hint:
+                                              '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022',
+                                          obscure: _obscure,
+                                          focusNode: _passwordFocus,
+                                          enabled: !_isLocked,
+                                          textInputAction: TextInputAction.done,
+                                          autofillHints: const [
+                                            AutofillHints.password,
+                                          ],
+                                          suffix: IconButton(
+                                            tooltip: _obscure
+                                                ? 'Show password'
+                                                : 'Hide password',
+                                            icon: Icon(
+                                              // Icon always mirrors the current state:
+                                              // slashed eye = hidden, open eye = visible.
+                                              _obscure
+                                                  ? Icons
+                                                        .visibility_off_outlined
+                                                  : Icons.visibility_outlined,
+                                              color: AppColors.textSecondary,
+                                              size: 20,
+                                            ),
+                                            onPressed: () => setState(
+                                              () => _obscure = !_obscure,
+                                            ),
+                                          ),
+                                          validator: (v) {
+                                            if (v == null || v.isEmpty) {
+                                              return 'Please enter your password.';
+                                            }
+                                            if (v.length < 6) {
+                                              return 'Password must be at least 6 characters.';
+                                            }
+                                            return null;
+                                          },
+                                          onFieldSubmitted: (_) => _submit(),
+                                        ),
+                                      ],
                                     ),
-                                    validator: (v) {
-                                      if (v == null || v.isEmpty) {
-                                        return 'Please enter your password.';
-                                      }
-                                      if (v.length < 6) {
-                                        return 'Password must be at least 6 characters.';
-                                      }
-                                      return null;
-                                    },
-                                    onFieldSubmitted: (_) => _submit(),
+                                  ),
+                                  const SizedBox(height: 2),
+
+                                  // Forgot password (right aligned, like the
+                                  // logistics web login)
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: TextButton(
+                                      onPressed: _isLocked
+                                          ? null
+                                          : _showForgotPassword,
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: AppTheme.primary,
+                                        textStyle: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 4,
+                                        ),
+                                        minimumSize: const Size(0, 36),
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                      child:
+                                          const Text('Forgot password?'),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+
+                                  // Remember me
+                                  Row(
+                                    children: [
+                                      SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: Checkbox(
+                                          value: _rememberMe,
+                                          onChanged: (v) => setState(
+                                            () => _rememberMe = v ?? false,
+                                          ),
+                                          activeColor: AppTheme.primary,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Text(
+                                        'Remember me',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+
+                                  // Inline login error (accessible, persistent)
+                                  if (_errorMessage != null) ...[
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFFF1E8),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: AppColors.warning.withValues(
+                                            alpha: 0.5,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const Icon(
+                                            Icons.error_outline,
+                                            size: 20,
+                                            color: AppColors.warning,
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Text(
+                                              _errorMessage!,
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                height: 1.4,
+                                                color: AppColors.textPrimary,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                  ],
+
+                                  // Sign in button
+                                  PrimaryButton(
+                                    label: 'Sign In',
+                                    loading: _busy,
+                                    onPressed: _submit,
+                                  ),
+                                  const SizedBox(height: 12),
+
+                                  // Apply as a rider (below sign in)
+                                  OutlinedButton.icon(
+                                    onPressed: _isLocked
+                                        ? null
+                                        : () => Navigator.of(context).push(
+                                              MaterialPageRoute(
+                                                builder: (_) =>
+                                                    const ApplyScreen(),
+                                              ),
+                                            ),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: AppTheme.primary,
+                                      side: const BorderSide(
+                                        color: AppTheme.primary,
+                                        width: 1.5,
+                                      ),
+                                      minimumSize:
+                                          const Size.fromHeight(50),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(12),
+                                      ),
+                                      textStyle: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    icon: const Icon(
+                                      Icons.person_add_outlined,
+                                      size: 20,
+                                    ),
+                                    label: const Text('Apply as a Rider'),
                                   ),
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 8),
+                          ),
+                          const SizedBox(height: 8),
 
-                            // Remember me
-                            Row(
-                              children: [
-                                SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: Checkbox(
-                                    value: _rememberMe,
-                                    onChanged: (v) => setState(
-                                      () => _rememberMe = v ?? false,
-                                    ),
-                                    activeColor: AppTheme.primary,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  'Remember me',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 20),
-
-                            // Inline login error (accessible, persistent)
-                            if (_errorMessage != null) ...[
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFFF1E8),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: AppColors.warning.withValues(
-                                      alpha: 0.5,
-                                    ),
-                                  ),
-                                ),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Icon(
-                                      Icons.error_outline,
-                                      size: 20,
-                                      color: AppColors.warning,
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        _errorMessage!,
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          height: 1.4,
-                                          color: AppColors.textPrimary,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                          // ── Check application status (outside the card,
+                          // like the logistics web login) ──
+                          OutlinedButton.icon(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    const ApplicationStatusScreen(),
                               ),
-                              const SizedBox(height: 16),
-                            ],
-
-                            // Login button
-                            PrimaryButton(
-                              label: 'Sign in to Rider Center',
-                              loading: _busy,
-                              onPressed: _submit,
                             ),
-                          ],
-                        ),
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: AppTheme.primary,
+                              side: BorderSide(
+                                color: AppColors.border,
+                              ),
+                              minimumSize: const Size.fromHeight(50),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            icon: const Icon(Icons.search, size: 18),
+                            label: const Text('Check Application Status'),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 8),
-
-                    // ── Apply as a rider / check application status ──
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextButton(
-                            onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const ApplyScreen(),
-                              ),
-                            ),
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppTheme.primary,
-                              textStyle: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            child: const Text(
-                              'Apply as a Rider',
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextButton(
-                            onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const ApplicationStatusScreen(),
-                              ),
-                            ),
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppTheme.primary,
-                              textStyle: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            child: const Text(
-                              'Check Application Status',
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
                   ],
                 ),
               ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -398,15 +576,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
 /// Curved teal header with logo, app name, and "RIDER CENTER" subtitle.
 class _CurvedHeader extends StatelessWidget {
-  const _CurvedHeader({required this.screenHeight});
+  const _CurvedHeader({required this.height});
 
-  final double screenHeight;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
-    // Clamp the decorative header so short (landscape) and very tall screens
-    // both leave room for the form without forcing overflow.
-    final headerHeight = screenHeight.clamp(120.0, 260.0);
+    final headerHeight = height;
 
     return ClipRRect(
       borderRadius: const BorderRadius.only(
@@ -419,14 +595,15 @@ class _CurvedHeader extends StatelessWidget {
         child: CustomPaint(
           painter: _HeaderPainter(),
           child: SafeArea(
+            top: false,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 // Logo circle — uses Driver_app/images/logo.png
                 Container(
-                  width: 72,
-                  height: 72,
+                  width: 60,
+                  height: 60,
                   decoration: BoxDecoration(
                     color: AppColors.primaryDark,
                     shape: BoxShape.circle,
@@ -435,30 +612,31 @@ class _CurvedHeader extends StatelessWidget {
                       width: 1.5,
                     ),
                   ),
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(8),
                   child: ClipOval(
                     child: Image.asset('images/logo.png', fit: BoxFit.contain),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 const Text(
                   'Invoiz',
                   style: TextStyle(
-                    fontSize: 28,
+                    fontSize: 24,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
                     letterSpacing: 0.5,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 const Text(
                   'R  I  D  E  R     C  E  N  T  E  R',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
                     color: Colors.white70,
-                    letterSpacing: 2,
+                    letterSpacing: 1,
                   ),
+                  maxLines: 1,
                 ),
               ],
             ),

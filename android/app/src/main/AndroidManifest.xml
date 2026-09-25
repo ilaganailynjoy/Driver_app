@@ -3,7 +3,7 @@
          printed on INVOIZ shipping labels. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <application
-        android:label="invoize_rider"
+        android:label="Invoiz Rider"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
