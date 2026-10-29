@@ -4,9 +4,12 @@ import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/app_ui.dart';
+import '../../widgets/stagger_in.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/change_password_screen.dart';
 import '../profile/profile_screen.dart';
+import '../onboarding/rider_tutorial_screen.dart';
 
 /// Simple settings hub: account shortcuts, notifications entry,
 /// app version and logout.
@@ -23,89 +26,124 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _SectionLabel('Account'),
-          Card(
-            margin: EdgeInsets.zero,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.person_outline),
-                  title: const Text('Profile'),
-                  subtitle: const Text('View and edit rider profile'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const ProfileScreen(),
-                    ),
-                  ),
+          const StaggerIn(index: 0, child: SectionEyebrow(text: 'Account')),
+          StaggerIn(
+            index: 1,
+            child: Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
                 ),
-                const Divider(height: 1, indent: 16, endIndent: 16),
-                ListTile(
-                  leading: const Icon(Icons.lock_outline),
-                  title: const Text('Change Password'),
-                  subtitle: const Text('Update your login password'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const ChangePasswordScreen(),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InfoTile(
+                      icon: Icons.person_outline,
+                      iconColor: AppColors.textSecondary,
+                      title: 'Profile',
+                      subtitle: 'View and edit rider profile',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ProfileScreen(),
+                        ),
+                      ),
                     ),
-                  ),
+                    const Divider(height: 1, indent: 4, endIndent: 4),
+                    InfoTile(
+                      icon: Icons.lock_outline,
+                      iconColor: AppColors.textSecondary,
+                      title: 'Change Password',
+                      subtitle: 'Update your login password',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ChangePasswordScreen(),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
           const SizedBox(height: 20),
-          _SectionLabel('General'),
-          Card(
-            margin: EdgeInsets.zero,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.notifications_outlined),
-                  title: const Text('Notifications'),
-                  subtitle: const Text('View rider notifications'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const NotificationsScreen(),
-                    ),
-                  ),
+          const StaggerIn(index: 2, child: SectionEyebrow(text: 'General')),
+          StaggerIn(
+            index: 3,
+            child: Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
                 ),
-                const Divider(height: 1, indent: 16, endIndent: 16),
-                FutureBuilder<PackageInfo>(
-                  future: PackageInfo.fromPlatform(),
-                  builder: (context, snapshot) {
-                    final info = snapshot.data;
-                    return ListTile(
-                      leading: const Icon(Icons.info_outline),
-                      title: const Text('App Version'),
-                      subtitle: Text(
-                        info == null
-                            ? 'Invoiz Rider'
-                            : 'Invoiz Rider ${info.version} (${info.buildNumber})',
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    InfoTile(
+                      icon: Icons.notifications_outlined,
+                      iconColor: AppColors.textSecondary,
+                      title: 'Notifications',
+                      subtitle: 'View rider notifications',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const NotificationsScreen(),
+                        ),
                       ),
-                    );
-                  },
+                    ),
+                    const Divider(height: 1, indent: 4, endIndent: 4),
+                    InfoTile(
+                      icon: Icons.help_outline,
+                      iconColor: AppColors.textSecondary,
+                      title: 'Help & Tutorial',
+                      subtitle: 'Replay the rider app introduction',
+                      onTap: () {
+                        final rider = context.read<AuthProvider>().rider;
+                        if (rider == null) return;
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                RiderTutorialScreen(riderId: rider.id),
+                          ),
+                        );
+                      },
+                    ),
+                    const Divider(height: 1, indent: 4, endIndent: 4),
+                    FutureBuilder<PackageInfo>(
+                      future: PackageInfo.fromPlatform(),
+                      builder: (context, snapshot) {
+                        final info = snapshot.data;
+                        return InfoTile(
+                          icon: Icons.info_outline,
+                          iconColor: AppColors.textSecondary,
+                          title: 'App Version',
+                          subtitle: info == null
+                              ? 'Invoiz Rider'
+                              : 'Invoiz Rider ${info.version} (${info.buildNumber})',
+                        );
+                      },
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
           const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () => _confirmLogout(
-              context,
-              context.read<AuthProvider>(),
+          StaggerIn(
+            index: 4,
+            child: ElevatedButton.icon(
+              onPressed: () =>
+                  _confirmLogout(context, context.read<AuthProvider>()),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: AppTheme.danger,
+                elevation: 0,
+                side: BorderSide.none,
+              ),
+              icon: const Icon(Icons.logout),
+              label: const Text('Log Out'),
             ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: AppTheme.danger,
-              elevation: 0,
-              side: BorderSide.none,
-            ),
-            icon: const Icon(Icons.logout),
-            label: const Text('Log Out'),
           ),
         ],
       ),
@@ -136,26 +174,6 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 8),
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w600,
-            ),
       ),
     );
   }

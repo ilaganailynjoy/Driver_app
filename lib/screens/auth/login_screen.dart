@@ -9,6 +9,7 @@ import '../apply/application_status_screen.dart';
 import '../home/home_shell.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/primary_button.dart';
+import 'forgot_password_screen.dart';
 
 /// Rider login screen with curved teal header, rounded card, and test credentials.
 class LoginScreen extends StatefulWidget {
@@ -158,9 +159,8 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Rider accounts are created and managed by INVOIZ '
-                'Logistics. Message us and we will resend your login '
-                'credentials.',
+                'Reset your password via email, or contact INVOIZ '
+                'Logistics to resend your login credentials.',
                 style: TextStyle(
                   fontSize: 14,
                   height: 1.5,
@@ -168,6 +168,18 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 16),
+              PrimaryButton(
+                label: 'Reset Password via Email',
+                onPressed: () {
+                  Navigator.of(sheetContext).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ForgotPasswordScreen(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
               PrimaryButton(
                 label: 'Check Application Status',
                 onPressed: () {

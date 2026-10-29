@@ -1,10 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/input_validation.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/app_ui.dart';
 import '../../services/delivery_service.dart';
 import '../../widgets/error_widget.dart';
 import '../../widgets/loading_widget.dart';
@@ -18,7 +21,11 @@ import 'parcel_scan_controller.dart';
 /// or mutates data; the resolved delivery opens in [DeliveryDetailScreen]
 /// so the rider continues with the existing delivery workflow.
 class ScanParcelScreen extends StatefulWidget {
-  const ScanParcelScreen({super.key, this.cameraEnabled = true, this.controller});
+  const ScanParcelScreen({
+    super.key,
+    this.cameraEnabled = true,
+    this.controller,
+  });
 
   /// Test seam: when false the camera widget is replaced by a static
   /// preview so widget tests run without a platform camera.
@@ -35,6 +42,7 @@ class ScanParcelScreen extends StatefulWidget {
 class _ScanParcelScreenState extends State<ScanParcelScreen>
     with WidgetsBindingObserver {
   late final ParcelScanController _scan;
+  final _manualController = TextEditingController();
   bool _ownsScanController = true;
   MobileScannerController? _camera;
   bool _navigated = false;
@@ -44,10 +52,9 @@ class _ScanParcelScreenState extends State<ScanParcelScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _ownsScanController = widget.controller == null;
-    _scan = widget.controller ??
-        ParcelScanController(
-          DeliveryService(context.read<AuthProvider>().api),
-        );
+    _scan =
+        widget.controller ??
+        ParcelScanController(DeliveryService(context.read<AuthProvider>().api));
     _scan.addListener(_onScanChanged);
     if (widget.cameraEnabled) {
       _camera = MobileScannerController();
@@ -93,12 +100,64 @@ class _ScanParcelScreenState extends State<ScanParcelScreen>
     if (mounted) setState(() {});
   }
 
+  Future<void> _enterTrackingManually() async {
+    if (_scan.state == ParcelScanState.lookingUp) return;
+    _manualController.clear();
+    final value = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Enter tracking number'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Type the number printed under the QR code on the parcel label.',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _manualController,
+              autofocus: true,
+              textCapitalization: TextCapitalization.characters,
+              textInputAction: TextInputAction.done,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9-]')),
+                UpperCaseTextFormatter(),
+                LengthLimitingTextInputFormatter(40),
+              ],
+              decoration: const InputDecoration(
+                labelText: 'Tracking number',
+                hintText: 'TRK-YYYYMMDD-XXXX',
+              ),
+              onSubmitted: (v) => Navigator.of(dialogContext).pop(v.trim()),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(_manualController.text.trim()),
+            child: const Text('Look Up'),
+          ),
+        ],
+      ),
+    );
+    if (value == null || value.isEmpty || !mounted) return;
+    await _scan.submitManual(value);
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _scan.removeListener(_onScanChanged);
     if (_ownsScanController) _scan.dispose();
     _camera?.dispose();
+    _manualController.dispose();
     super.dispose();
   }
 
@@ -122,6 +181,7 @@ class _ScanParcelScreenState extends State<ScanParcelScreen>
                 permanentlyDenied: _scan.cameraPermanentlyDenied,
                 onOpenSettings: () => _scan.openSystemSettings(),
                 onRetry: () => _scan.init(),
+                onManualEntry: _enterTrackingManually,
               );
             case ParcelScanState.scanning:
             case ParcelScanState.lookingUp:
@@ -137,6 +197,7 @@ class _ScanParcelScreenState extends State<ScanParcelScreen>
                 onTorch: () => _camera?.toggleTorch(),
                 torchListenable: _camera,
                 onScanAgain: _scanAgain,
+                onManualEntry: _enterTrackingManually,
               );
             case ParcelScanState.found:
               return const LoadingWidget(label: 'Opening parcel…');
@@ -150,12 +211,10 @@ class _ScanParcelScreenState extends State<ScanParcelScreen>
     return switch (state) {
       ParcelScanState.invalid =>
         'Invalid parcel QR code.\nPlease scan an INVOIZ parcel label.',
-      ParcelScanState.notFound =>
-        'No parcel found for this tracking number.',
+      ParcelScanState.notFound => 'No parcel found for this tracking number.',
       ParcelScanState.forbidden =>
         'You are not authorized to access this parcel.',
-      ParcelScanState.networkError =>
-        'Unable to connect. Please try again.',
+      ParcelScanState.networkError => 'Unable to connect. Please try again.',
       _ => null,
     };
   }
@@ -172,6 +231,7 @@ class _ScannerView extends StatelessWidget {
     required this.onTorch,
     required this.torchListenable,
     required this.onScanAgain,
+    required this.onManualEntry,
   });
 
   final MobileScannerController? camera;
@@ -181,6 +241,7 @@ class _ScannerView extends StatelessWidget {
   final VoidCallback onTorch;
   final ValueListenable<MobileScannerState>? torchListenable;
   final VoidCallback onScanAgain;
+  final VoidCallback onManualEntry;
 
   @override
   Widget build(BuildContext context) {
@@ -204,7 +265,7 @@ class _ScannerView extends StatelessWidget {
         else
           const ColoredBox(
             color: Colors.black54,
-            child: Center(child: _ScanFrame()),
+            child: Center(child: _ScanFrame(active: false)),
           ),
         if (camera != null) const Center(child: _ScanFrame()),
         Positioned(
@@ -215,12 +276,38 @@ class _ScannerView extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
               color: Colors.black.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
             ),
-            child: const Text(
-              'Scan the QR code on the parcel label',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white, fontSize: 14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.qr_code_scanner, color: Colors.white, size: 16),
+                    SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Scan the QR code on the parcel label',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white, fontSize: 14),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                TextButton.icon(
+                  onPressed: busy ? null : onManualEntry,
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    disabledForegroundColor: Colors.white54,
+                  ),
+                  icon: const Icon(Icons.keyboard_outlined, size: 16),
+                  label: const Text('Enter tracking number'),
+                ),
+              ],
             ),
           ),
         ),
@@ -267,25 +354,25 @@ class _ScannerView extends StatelessWidget {
             right: 24,
             bottom: 120,
             child: Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppGaps.lg),
               decoration: BoxDecoration(
                 color: AppColors.card,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.qr_code_2_outlined,
-                      size: 36, color: AppColors.textSecondary),
-                  const SizedBox(height: 8),
+                  const IconTile(
+                    icon: Icons.qr_code_2_outlined,
+                    size: 48,
+                    iconSize: 24,
+                    color: AppColors.textSecondary,
+                  ),
+                  const SizedBox(height: AppGaps.sm),
                   Text(
                     error!,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 14,
-                      height: 1.4,
-                    ),
+                    style: AppText.body,
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
@@ -309,9 +396,51 @@ class _ScannerView extends StatelessWidget {
   }
 }
 
-/// Corner-style scanning frame overlay.
-class _ScanFrame extends StatelessWidget {
-  const _ScanFrame();
+/// Corner-style scanning frame overlay with an animated scan line.
+///
+/// The line sweeps only while [active] is true; otherwise the frame renders
+/// statically. Lifecycle is owned here (disposed with the widget), so the
+/// animation can never run in the background.
+class _ScanFrame extends StatefulWidget {
+  const _ScanFrame({this.active = true});
+
+  final bool active;
+
+  @override
+  State<_ScanFrame> createState() => _ScanFrameState();
+}
+
+class _ScanFrameState extends State<_ScanFrame>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _sweep;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    );
+    _sweep = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+    if (widget.active) _controller.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ScanFrame oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active && !_controller.isAnimating) {
+      _controller.repeat(reverse: true);
+    } else if (!widget.active && _controller.isAnimating) {
+      _controller.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -319,10 +448,7 @@ class _ScanFrame extends StatelessWidget {
     const arm = 36.0;
     const edge = BorderSide(color: Colors.white, width: 5);
 
-    Widget corner({
-      required bool left,
-      required bool top,
-    }) {
+    Widget corner({required bool left, required bool top}) {
       return SizedBox(
         width: arm,
         height: arm,
@@ -346,10 +472,36 @@ class _ScanFrame extends StatelessWidget {
         children: [
           Positioned(top: 0, left: 0, child: corner(left: true, top: true)),
           Positioned(top: 0, right: 0, child: corner(left: false, top: true)),
+          Positioned(bottom: 0, left: 0, child: corner(left: true, top: false)),
           Positioned(
-              bottom: 0, left: 0, child: corner(left: true, top: false)),
-          Positioned(
-              bottom: 0, right: 0, child: corner(left: false, top: false)),
+            bottom: 0,
+            right: 0,
+            child: corner(left: false, top: false),
+          ),
+          if (widget.active)
+            AnimatedBuilder(
+              animation: _sweep,
+              builder: (context, _) {
+                return Positioned(
+                  top: 12 + _sweep.value * (side - 24 - 3),
+                  left: 24,
+                  right: 24,
+                  child: Container(
+                    height: 3,
+                    decoration: BoxDecoration(
+                      color: AppColors.secondary,
+                      borderRadius: BorderRadius.circular(2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.secondary.withValues(alpha: 0.7),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
         ],
       ),
     );
@@ -361,11 +513,13 @@ class _PermissionDenied extends StatelessWidget {
     required this.permanentlyDenied,
     required this.onOpenSettings,
     required this.onRetry,
+    required this.onManualEntry,
   });
 
   final bool permanentlyDenied;
   final VoidCallback onOpenSettings;
   final VoidCallback onRetry;
+  final VoidCallback onManualEntry;
 
   @override
   Widget build(BuildContext context) {
@@ -377,19 +531,26 @@ class _PermissionDenied extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.videocam_off_outlined,
-                  size: 56, color: AppColors.textSecondary),
-              const SizedBox(height: 16),
+              Container(
+                width: 84,
+                height: 84,
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                ),
+                child: const Icon(
+                  Icons.videocam_off_outlined,
+                  size: 38,
+                  color: AppTheme.primary,
+                ),
+              ),
+              const SizedBox(height: AppGaps.lg),
               Text(
                 permanentlyDenied
                     ? 'Camera access is disabled. Enable it in system settings to scan parcels.'
                     : 'Camera access is needed to scan parcel labels.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 15,
-                  height: 1.4,
-                ),
+                style: AppText.body.copyWith(fontSize: 15),
               ),
               const SizedBox(height: 20),
               if (permanentlyDenied)
@@ -410,6 +571,12 @@ class _PermissionDenied extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(200, 48),
                 ),
+              ),
+              const SizedBox(height: 12),
+              TextButton.icon(
+                onPressed: onManualEntry,
+                icon: const Icon(Icons.keyboard_outlined, size: 18),
+                label: const Text('Enter tracking number instead'),
               ),
             ],
           ),

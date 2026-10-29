@@ -10,20 +10,28 @@ import 'parcel_tracking.dart';
 enum ParcelScanState {
   /// Checking camera permission (transient).
   checkingPermission,
+
   /// Camera permission denied — guidance + retry/settings actions.
   permissionDenied,
+
   /// Camera active, waiting for a QR code.
   scanning,
+
   /// Valid QR captured, delivery lookup in flight.
   lookingUp,
+
   /// Payload is not an INVOIZ tracking number — rider may scan again.
   invalid,
+
   /// Well-formed tracking number, no matching delivery.
   notFound,
+
   /// Delivery exists but this rider may not access it.
   forbidden,
+
   /// Connectivity / server failure.
   networkError,
+
   /// Terminal: delivery resolved — the screen navigates to it.
   found,
 }
@@ -40,12 +48,12 @@ class ParcelScanController extends ChangeNotifier {
     Future<PermissionStatus> Function()? requestCameraPermission,
     Future<bool> Function()? isCameraPermanentlyDenied,
     Future<void> Function()? openSystemSettings,
-  })  : _requestCameraPermission =
-            requestCameraPermission ?? (() => Permission.camera.request()),
-        _isCameraPermanentlyDenied = isCameraPermanentlyDenied ??
-            (() async => Permission.camera.isPermanentlyDenied),
-        _openSystemSettings =
-            openSystemSettings ?? (() => openAppSettings());
+  }) : _requestCameraPermission =
+           requestCameraPermission ?? (() => Permission.camera.request()),
+       _isCameraPermanentlyDenied =
+           isCameraPermanentlyDenied ??
+           (() async => Permission.camera.isPermanentlyDenied),
+       _openSystemSettings = openSystemSettings ?? (() => openAppSettings());
 
   final DeliveryService _service;
   final Future<PermissionStatus> Function() _requestCameraPermission;
@@ -89,6 +97,27 @@ class ParcelScanController extends ChangeNotifier {
       return;
     }
 
+    await _lookup(tracking);
+  }
+
+  /// Resolve a tracking number typed by the rider (manual entry fallback for
+  /// unreadable or missing labels). Behaves exactly like a scan: the same
+  /// validation, single-shot guard and backend lookup are used.
+  Future<void> submitManual(String? raw) async {
+    if (_state == ParcelScanState.lookingUp) return;
+    if (_state == ParcelScanState.found) return;
+
+    final tracking = ParcelTracking.validated(raw);
+    if (tracking == null) {
+      _scannedTracking = ParcelTracking.normalize(raw);
+      _transition(ParcelScanState.invalid);
+      return;
+    }
+
+    await _lookup(tracking);
+  }
+
+  Future<void> _lookup(String tracking) async {
     _scannedTracking = tracking;
     _transition(ParcelScanState.lookingUp);
 
@@ -98,8 +127,8 @@ class ParcelScanController extends ChangeNotifier {
     } on ApiException catch (e) {
       _transition(switch (e.type) {
         ApiErrorType.notFound => ParcelScanState.notFound,
-        ApiErrorType.forbidden || ApiErrorType.unauthorized =>
-          ParcelScanState.forbidden,
+        ApiErrorType.forbidden ||
+        ApiErrorType.unauthorized => ParcelScanState.forbidden,
         _ => ParcelScanState.networkError,
       });
     } catch (_) {

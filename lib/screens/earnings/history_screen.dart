@@ -7,6 +7,7 @@ import '../../models/earning.dart';
 import '../../providers/earnings_provider.dart';
 import '../../widgets/error_widget.dart';
 import '../../widgets/loading_widget.dart';
+import '../deliveries/delivery_detail_screen.dart';
 
 /// Delivery history with search + status filter.
 class HistoryScreen extends StatefulWidget {
@@ -19,6 +20,10 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   final _searchController = TextEditingController();
   String _status = '';
+  DateTimeRange? _range;
+
+  static String? _apiDate(DateTime? date) =>
+      date?.toIso8601String().split('T').first;
 
   @override
   void initState() {
@@ -38,7 +43,32 @@ class _HistoryScreenState extends State<HistoryScreen> {
     await provider.loadHistory(
       search: _searchController.text.trim(),
       status: _status,
+      from: _apiDate(_range?.start),
+      to: _apiDate(_range?.end),
     );
+  }
+
+  Future<void> _pickRange(EarningsProvider provider) async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(now.year - 3),
+      lastDate: now,
+      initialDateRange: _range,
+      helpText: 'Filter delivery history by date',
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _range = picked);
+    await _reload(provider);
+  }
+
+  String get _rangeLabel {
+    final range = _range;
+    if (range == null) return 'Date';
+    String short(DateTime d) =>
+        '${d.year}-${d.month.toString().padLeft(2, '0')}-'
+        '${d.day.toString().padLeft(2, '0')}';
+    return '${short(range.start)} – ${short(range.end)}';
   }
 
   @override
@@ -56,6 +86,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
               onSubmitted: (_) => _reload(provider),
               decoration: InputDecoration(
                 hintText: 'Search by tracking no., shop, customer...',
+                filled: true,
+                fillColor: AppColors.surfaceSoft,
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.clear),
@@ -63,6 +95,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     _searchController.clear();
                     _reload(provider);
                   },
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  borderSide: BorderSide.none,
                 ),
               ),
             ),
@@ -99,6 +135,42 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     _reload(provider);
                   },
                 ),
+                const SizedBox(width: 8),
+                _FilterChip(
+                  label: 'Lost',
+                  selected: _status == 'lost',
+                  onPressed: () {
+                    setState(() => _status = 'lost');
+                    _reload(provider);
+                  },
+                ),
+                const SizedBox(width: 8),
+                _FilterChip(
+                  label: 'Damaged',
+                  selected: _status == 'damaged',
+                  onPressed: () {
+                    setState(() => _status = 'damaged');
+                    _reload(provider);
+                  },
+                ),
+                const SizedBox(width: 8),
+                _FilterChip(
+                  label: _rangeLabel,
+                  selected: _range != null,
+                  icon: Icons.date_range_outlined,
+                  onPressed: () => _pickRange(provider),
+                ),
+                if (_range != null) ...[
+                  const SizedBox(width: 8),
+                  _FilterChip(
+                    label: 'Clear dates',
+                    selected: false,
+                    onPressed: () {
+                      setState(() => _range = null);
+                      _reload(provider);
+                    },
+                  ),
+                ],
               ],
             ),
           ),
@@ -129,13 +201,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         children: const [
-          SizedBox(height: 100),
-          Icon(Icons.history, size: 56, color: AppColors.textSecondary),
-          SizedBox(height: 16),
-          Text(
-            'No delivery history',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          SizedBox(height: 80),
+          EmptyState(
+            icon: Icons.history,
+            title: 'No delivery history',
           ),
         ],
       );
@@ -146,7 +215,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
       padding: const EdgeInsets.all(16),
       itemCount: provider.history.length,
       itemBuilder: (context, index) {
-        return _HistoryCard(entry: provider.history[index]);
+        final entry = provider.history[index];
+        return _HistoryCard(
+          entry: entry,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => DeliveryDetailScreen(deliveryId: entry.id),
+            ),
+          ),
+        );
       },
     );
   }
@@ -157,15 +234,24 @@ class _FilterChip extends StatelessWidget {
     required this.label,
     required this.selected,
     required this.onPressed,
+    this.icon,
   });
 
   final String label;
   final bool selected;
   final VoidCallback onPressed;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
     return ChoiceChip(
+      avatar: icon == null
+          ? null
+          : Icon(
+              icon,
+              size: 16,
+              color: selected ? Colors.white : AppColors.textSecondary,
+            ),
       label: Text(label),
       selected: selected,
       onSelected: (_) => onPressed(),
@@ -179,78 +265,101 @@ class _FilterChip extends StatelessWidget {
 }
 
 class _HistoryCard extends StatelessWidget {
-  const _HistoryCard({required this.entry});
+  const _HistoryCard({required this.entry, this.onTap});
 
   final HistoryEntry entry;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final isDelivered = entry.status == 'delivered';
-    final color = isDelivered ? AppColors.success : AppColors.warning;
+    final isLostOrDamaged =
+        entry.status == 'lost' || entry.status == 'damaged';
+    final color = isDelivered
+        ? AppColors.success
+        : isLostOrDamaged
+        ? AppTheme.danger
+        : AppColors.warning;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    entry.trackingNumber,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w800, fontSize: 14),
-                  ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    entry.statusLabel,
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      entry.trackingNumber,
+                      style: AppText.tracking.copyWith(fontSize: 14),
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text('${entry.shopName} → ${entry.customerName}',
-                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-            const SizedBox(height: 4),
-            Text(
-              FormatUtils.dateTime(entry.deliveredAt),
-              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  _paymentLabel(entry.paymentMethod),
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.textSecondary),
-                ),
-                if (entry.earned != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      entry.statusLabel,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '${entry.shopName} → ${entry.customerName}',
+                style: AppText.secondary.copyWith(fontSize: 13),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                FormatUtils.dateTime(entry.deliveredAt),
+                style: AppText.caption.copyWith(fontSize: 12),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
                   Text(
-                    'Earned ${FormatUtils.peso(entry.earned!)}',
+                    _paymentLabel(entry.paymentMethod),
                     style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14,
-                      color: AppTheme.primary,
-                    ),
+                        fontSize: 12, color: AppColors.textSecondary),
                   ),
-              ],
-            ),
-          ],
+                  if (entry.earned != null)
+                    Text(
+                      'Earned ${FormatUtils.peso(entry.earned!)}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                        color: AppTheme.primary,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Icon(
+                    Icons.chevron_right,
+                    size: 18,
+                    color: AppColors.textSecondary,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

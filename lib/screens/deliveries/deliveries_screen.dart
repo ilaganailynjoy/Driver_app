@@ -6,6 +6,7 @@ import '../../providers/delivery_provider.dart';
 import '../../widgets/delivery_card.dart';
 import '../../widgets/error_widget.dart';
 import '../../widgets/loading_widget.dart';
+import '../../widgets/stagger_in.dart';
 import '../scan/scan_parcel_screen.dart';
 import 'delivery_detail_screen.dart';
 
@@ -67,7 +68,16 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
     if (provider.deliveries.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        children: const [SizedBox(height: 80), _EmptyDeliveries()],
+        children: const [
+          SizedBox(height: 80),
+          StaggerIn(
+            child: EmptyState(
+              icon: Icons.inventory_2_outlined,
+              title: 'No deliveries here',
+              message: 'New assignments will appear here.',
+            ),
+          ),
+        ],
       );
     }
 
@@ -79,6 +89,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
         final delivery = provider.deliveries[index];
         return DeliveryCard(
           delivery: delivery,
+          staggerIndex: index,
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
@@ -127,34 +138,6 @@ class _FilterBar extends StatelessWidget {
           );
         }).toList(),
       ),
-    );
-  }
-}
-
-class _EmptyDeliveries extends StatelessWidget {
-  const _EmptyDeliveries();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Column(
-      children: [
-        SizedBox(height: 40),
-        Icon(
-          Icons.inventory_2_outlined,
-          size: 56,
-          color: AppColors.textSecondary,
-        ),
-        SizedBox(height: 16),
-        Text(
-          'No deliveries here',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-        ),
-        SizedBox(height: 6),
-        Text(
-          'New assignments will appear here.',
-          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-        ),
-      ],
     );
   }
 }

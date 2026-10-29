@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/name_validation.dart';
 import '../../services/address_service.dart';
 import '../../services/center_application_service.dart';
 import '../../widgets/address_fields.dart';
@@ -92,16 +93,33 @@ class _ApplyCenterScreenState extends State<ApplyCenterScreen> {
   static const _maxDocBytes = 5 * 1024 * 1024;
 
   static const _docs = [
-    _DocSlot(key: 'business_registration', label: 'Business Registration (DTI/SEC)', required: true),
+    _DocSlot(
+      key: 'business_registration',
+      label: 'Business Registration (DTI/SEC)',
+      required: true,
+    ),
     _DocSlot(key: 'valid_id', label: "Owner's Valid ID", required: true),
-    _DocSlot(key: 'barangay_clearance', label: 'Barangay Clearance', required: false),
+    _DocSlot(
+      key: 'barangay_clearance',
+      label: 'Barangay Clearance',
+      required: false,
+    ),
     _DocSlot(key: 'mayors_permit', label: "Mayor's Permit", required: false),
-    _DocSlot(key: 'lease_contract', label: 'Lease / Proof of Location', required: false),
+    _DocSlot(
+      key: 'lease_contract',
+      label: 'Lease / Proof of Location',
+      required: false,
+    ),
     _DocSlot(key: 'other', label: 'Other Supporting Document', required: false),
   ];
 
   final _businessName = TextEditingController();
-  final _ownerName = TextEditingController();
+  final _ownerFirstName = TextEditingController();
+  final _ownerMiddleName = TextEditingController();
+  final _ownerLastName = TextEditingController();
+  final _secNumber = TextEditingController();
+  final _tin = TextEditingController();
+  final _postalCode = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
   AddressSelection? _addressSel;
@@ -111,15 +129,54 @@ class _ApplyCenterScreenState extends State<ApplyCenterScreen> {
   @override
   void dispose() {
     _businessName.dispose();
-    _ownerName.dispose();
+    _ownerFirstName.dispose();
+    _ownerMiddleName.dispose();
+    _ownerLastName.dispose();
+    _secNumber.dispose();
+    _tin.dispose();
+    _postalCode.dispose();
     _email.dispose();
     _phone.dispose();
     super.dispose();
   }
 
+  String? _regionCode() {
+    final code = _addressSel?.province?.regionCode;
+    return code == null || code.isEmpty ? null : code;
+  }
+
   String? _validate() {
-    if (_businessName.text.trim().isEmpty) return 'Please enter your business name.';
-    if (_ownerName.text.trim().isEmpty) return 'Please enter the owner name.';
+    if (_businessName.text.trim().isEmpty) {
+      return 'Please enter your business name.';
+    }
+    if (!NameValidation.isValidBusiness(_businessName.text, maxLength: 255)) {
+      return 'Please enter a valid business name.';
+    }
+    if (_ownerFirstName.text.trim().isEmpty) {
+      return 'Please enter the owner first name.';
+    }
+    if (!NameValidation.isValidPerson(_ownerFirstName.text, maxLength: 50)) {
+      return 'Please enter a valid owner first name.';
+    }
+    if (_ownerMiddleName.text.trim().isNotEmpty &&
+        !NameValidation.isValidPerson(_ownerMiddleName.text, maxLength: 50)) {
+      return 'Please enter a valid owner middle name.';
+    }
+    if (_ownerLastName.text.trim().isEmpty) {
+      return 'Please enter the owner last name.';
+    }
+    if (!NameValidation.isValidPerson(_ownerLastName.text, maxLength: 50)) {
+      return 'Please enter a valid owner last name.';
+    }
+    if (!RegExp(r'^[A-Za-z]{2}\d{9}$').hasMatch(_secNumber.text.trim())) {
+      return 'SEC number must be 2 letters followed by 9 digits (e.g., AB123456789).';
+    }
+    if (!RegExp(r'^\d{3}-\d{3}-\d{3}-\d{3}$').hasMatch(_tin.text.trim())) {
+      return 'TIN must be in the format 000-000-000-000.';
+    }
+    if (!RegExp(r'^\d{4}$').hasMatch(_postalCode.text.trim())) {
+      return 'Please enter a valid 4-digit postal code.';
+    }
     if (_email.text.trim().isEmpty) return 'Please enter your email.';
     final email = _email.text.trim();
     if (!RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(email)) {
@@ -131,6 +188,9 @@ class _ApplyCenterScreenState extends State<ApplyCenterScreen> {
     }
     if (_addressSel?.complete != true) {
       return 'Please select your Province, City/Municipality and Barangay.';
+    }
+    if (_regionCode() == null) {
+      return 'Please select a province with a valid region.';
     }
     for (final slot in _docs) {
       if (slot.required && !_uploaded.containsKey(slot.key)) {
@@ -150,7 +210,10 @@ class _ApplyCenterScreenState extends State<ApplyCenterScreen> {
       }
       if (!mounted) return;
       setState(() {
-        _uploaded[slot.key] = _PickedDoc(name: picked.name, bytes: picked.bytes);
+        _uploaded[slot.key] = _PickedDoc(
+          name: picked.name,
+          bytes: picked.bytes,
+        );
       });
     } on PlatformException {
       if (!mounted) return;
@@ -170,24 +233,31 @@ class _ApplyCenterScreenState extends State<ApplyCenterScreen> {
     FocusScope.of(context).unfocus();
     setState(() => _busy = true);
     try {
-      final result = await CenterApplicationService(
-              widget.apiClient ?? ApiClient())
-          .submit(
-        businessName: _businessName.text.trim(),
-        ownerName: _ownerName.text.trim(),
-        email: _email.text.trim(),
-        phone: _phone.text.replaceAll(RegExp(r'[\s\-()]'), ''),
-        address: _addressSel?.composed ?? '',
-        houseNumber: _addressSel?.houseNumber ?? '',
-        street: _addressSel?.street ?? '',
-        barangay: _addressSel?.barangay?.name ?? '',
-        municipality: _addressSel?.municipality?.name ?? '',
-        province: _addressSel?.province?.name ?? '',
-        documents: {
-          for (final e in _uploaded.entries)
-            e.key: (bytes: e.value.bytes, filename: e.value.name),
-        },
-      );
+      final result =
+          await CenterApplicationService(
+            widget.apiClient ?? ApiClient(),
+          ).submit(
+            businessName: NameValidation.normalize(_businessName.text),
+            ownerFirstName: NameValidation.normalize(_ownerFirstName.text),
+            ownerMiddleName: NameValidation.normalize(_ownerMiddleName.text),
+            ownerLastName: NameValidation.normalize(_ownerLastName.text),
+            secNumber: _secNumber.text.trim(),
+            tin: _tin.text.trim(),
+            postalCode: _postalCode.text.trim(),
+            region: _regionCode()!,
+            email: _email.text.trim(),
+            phone: _phone.text.replaceAll(RegExp(r'[\s\-()]'), ''),
+            address: _addressSel?.composed ?? '',
+            houseNumber: _addressSel?.houseNumber ?? '',
+            street: _addressSel?.street ?? '',
+            barangay: _addressSel?.barangay?.name ?? '',
+            municipality: _addressSel?.municipality?.name ?? '',
+            province: _addressSel?.province?.name ?? '',
+            documents: {
+              for (final e in _uploaded.entries)
+                e.key: (bytes: e.value.bytes, filename: e.value.name),
+            },
+          );
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
@@ -202,16 +272,20 @@ class _ApplyCenterScreenState extends State<ApplyCenterScreen> {
       if (!mounted) return;
       switch (e.type) {
         case ApiErrorType.validation:
-          _snack(e.message.isNotEmpty
-              ? e.message
-              : 'Please complete the required fields.');
+          _snack(
+            e.message.isNotEmpty
+                ? e.message
+                : 'Please complete the required fields.',
+          );
         case ApiErrorType.network:
         case ApiErrorType.timeout:
           _snack('Unable to connect. Please try again.');
         default:
-          _snack(e.message.isNotEmpty
-              ? e.message
-              : 'Submission failed. Please try again.');
+          _snack(
+            e.message.isNotEmpty
+                ? e.message
+                : 'Submission failed. Please try again.',
+          );
       }
     } catch (_) {
       if (!mounted) return;
@@ -222,9 +296,9 @@ class _ApplyCenterScreenState extends State<ApplyCenterScreen> {
   }
 
   void _snack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   InputDecoration _decoration(String label, {IconData? icon}) {
@@ -257,58 +331,124 @@ class _ApplyCenterScreenState extends State<ApplyCenterScreen> {
               const Text(
                 'Submit your business details and documents. Logistics will review your application and email the staff login credentials to you.',
                 style: TextStyle(
-                    fontSize: 14, color: AppColors.textSecondary, height: 1.5),
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                  height: 1.5,
+                ),
               ),
               const SizedBox(height: 20),
               TextField(
                 controller: _businessName,
                 textCapitalization: TextCapitalization.words,
-                decoration:
-                    _decoration('Business Name *', icon: Icons.storefront_outlined),
+                inputFormatters: [LengthLimitingTextInputFormatter(255)],
+                decoration: _decoration(
+                  'Business Name *',
+                  icon: Icons.storefront_outlined,
+                ),
               ),
               const SizedBox(height: 12),
               TextField(
-                controller: _ownerName,
+                controller: _ownerFirstName,
                 textCapitalization: TextCapitalization.words,
-                decoration:
-                    _decoration('Owner Name *', icon: Icons.person_outline),
+                inputFormatters: [LengthLimitingTextInputFormatter(50)],
+                decoration: _decoration(
+                  'Owner First Name *',
+                  icon: Icons.person_outline,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _ownerMiddleName,
+                textCapitalization: TextCapitalization.words,
+                inputFormatters: [LengthLimitingTextInputFormatter(50)],
+                decoration: _decoration(
+                  'Owner Middle Name',
+                  icon: Icons.person_outline,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _ownerLastName,
+                textCapitalization: TextCapitalization.words,
+                inputFormatters: [LengthLimitingTextInputFormatter(50)],
+                decoration: _decoration(
+                  'Owner Last Name *',
+                  icon: Icons.person_outline,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _secNumber,
+                textCapitalization: TextCapitalization.characters,
+                decoration: _decoration(
+                  'SEC Registration Number *',
+                  icon: Icons.badge_outlined,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _tin,
+                keyboardType: TextInputType.number,
+                decoration: _decoration(
+                  'TIN * (000-000-000-000)',
+                  icon: Icons.receipt_long_outlined,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _postalCode,
+                keyboardType: TextInputType.number,
+                decoration: _decoration(
+                  'Postal Code *',
+                  icon: Icons.markunread_mailbox_outlined,
+                ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _email,
                 keyboardType: TextInputType.emailAddress,
-                decoration:
-                    _decoration('Email *', icon: Icons.email_outlined),
+                decoration: _decoration('Email *', icon: Icons.email_outlined),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _phone,
                 keyboardType: TextInputType.phone,
-                decoration: _decoration('Mobile Number *',
-                    icon: Icons.phone_outlined),
+                decoration: _decoration(
+                  'Mobile Number *',
+                  icon: Icons.phone_outlined,
+                ),
               ),
               const SizedBox(height: 20),
-              const Text('Center Address *',
-                  style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary)),
+              const Text(
+                'Center Address *',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
               const SizedBox(height: 8),
               AddressFields(
                 onChanged: (sel) => setState(() => _addressSel = sel),
                 apiClient: widget.apiClient,
               ),
               const SizedBox(height: 20),
-              const Text('Supporting Documents',
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary)),
+              const Text(
+                'Supporting Documents',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
               const SizedBox(height: 6),
               const Text(
                 'Business Registration and the Owner\'s Valid ID are required. Documents can be photos or PDFs (max 5 MB each).',
                 style: TextStyle(
-                    fontSize: 13, color: AppColors.textSecondary, height: 1.5),
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                  height: 1.5,
+                ),
               ),
               const SizedBox(height: 12),
               for (final slot in _docs) _docTile(slot),
@@ -342,8 +482,8 @@ class _ApplyCenterScreenState extends State<ApplyCenterScreen> {
             picked != null
                 ? Icons.upload_file
                 : slot.required
-                    ? Icons.description_outlined
-                    : Icons.drive_file_rename_outline,
+                ? Icons.description_outlined
+                : Icons.drive_file_rename_outline,
             size: 22,
             color: picked != null ? AppTheme.primary : AppColors.textSecondary,
           ),
@@ -352,16 +492,24 @@ class _ApplyCenterScreenState extends State<ApplyCenterScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('${slot.label}${slot.required ? ' *' : ''}',
-                    style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w600)),
+                Text(
+                  '${slot.label}${slot.required ? ' *' : ''}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 if (picked != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
-                    child: Text(picked.name,
-                        style: const TextStyle(
-                            fontSize: 12, color: AppColors.textSecondary),
-                        overflow: TextOverflow.ellipsis),
+                    child: Text(
+                      picked.name,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
               ],
             ),
@@ -377,8 +525,11 @@ class _ApplyCenterScreenState extends State<ApplyCenterScreen> {
 }
 
 class _CenterApplySuccess extends StatelessWidget {
-  const _CenterApplySuccess(
-      {required this.result, required this.email, this.apiClient});
+  const _CenterApplySuccess({
+    required this.result,
+    required this.email,
+    this.apiClient,
+  });
   final CenterApplicationSubmitResult result;
   final String email;
   final ApiClient? apiClient;
@@ -396,8 +547,11 @@ class _CenterApplySuccess extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Icon(Icons.check_circle_outline,
-                  size: 64, color: AppColors.success),
+              const Icon(
+                Icons.check_circle_outline,
+                size: 64,
+                color: AppColors.success,
+              ),
               const SizedBox(height: 16),
               const Text(
                 'Your center application has been submitted!',
@@ -409,16 +563,16 @@ class _CenterApplySuccess extends StatelessWidget {
                 'Reference number: ${result.referenceNumber}',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.primary),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.primary,
+                ),
               ),
               const SizedBox(height: 8),
               const Text(
                 'Logistics will review your application and send the staff login credentials to your email when it is approved.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                    color: AppColors.textSecondary, height: 1.5),
+                style: TextStyle(color: AppColors.textSecondary, height: 1.5),
               ),
               const Spacer(),
               PrimaryButton(

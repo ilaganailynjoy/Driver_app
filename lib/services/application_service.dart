@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import '../core/network/api_client.dart';
 import '../core/network/api_exception.dart';
+import '../core/utils/name_validation.dart';
 
 /// Reference-number helpers shared by the apply + status screens.
 class ApplicationReference {
@@ -107,9 +108,11 @@ class ApplicationService {
     required String vehicleType,
     required String licensePlate,
     required String licenseNumber,
+    required String licenseExpiry,
     required String vehicleRegistration,
     required String riderType,
     required String vehicleOwnership,
+    required bool acceptedTerms,
     required Map<String, ({Uint8List bytes, String filename})> documents,
     String? middleInitial,
     String? sex,
@@ -121,18 +124,20 @@ class ApplicationService {
     String? province,
   }) async {
     final fields = <String, String>{
-      'name': name,
+      'name': NameValidation.normalize(name),
       'email': email,
       'phone': phone,
       'address': address,
       'vehicle_type': vehicleType,
       'license_plate': licensePlate,
       'license_number': licenseNumber,
+      'license_expiry': licenseExpiry,
       'vehicle_registration': vehicleRegistration,
       'rider_type': riderType,
       'vehicle_ownership': vehicleOwnership,
+      'accepted_terms': acceptedTerms ? '1' : '0',
       if (middleInitial != null && middleInitial.trim().isNotEmpty)
-        'middle_initial': middleInitial.trim(),
+        'middle_initial': NameValidation.normalize(middleInitial),
       if (sex != null && sex.trim().isNotEmpty) 'sex': sex.trim(),
       if (birthday != null && birthday.trim().isNotEmpty)
         'birthday': birthday.trim(),
@@ -148,11 +153,13 @@ class ApplicationService {
     };
     final files = <String, ({Uint8List bytes, String filename})>{};
     documents.forEach((k, v) => files['documents[$k]'] = v);
-    final data = await _api.postMultipartMany(
-      '/rider/apply',
-      files: files,
-      fields: fields,
-    ) as Map<String, dynamic>;
+    final data =
+        await _api.postMultipartMany(
+              '/rider/apply',
+              files: files,
+              fields: fields,
+            )
+            as Map<String, dynamic>;
     final app = (data['application'] as Map?) ?? {};
     return RiderApplicationSubmitResult(
       id: (app['id'] as num?)?.toInt() ?? 0,
@@ -163,22 +170,25 @@ class ApplicationService {
 
   /// Request a 6-digit email verification code (60s resend cooldown).
   /// Returns the backend message. Throws [ApiException] on failure.
-  Future<String> requestEmailCode({
-    required String email,
-    String? name,
-  }) async {
-    final data = await _api.post('/rider/email/request-code', body: {
-      'email': email,
-      if (name != null && name.isNotEmpty) 'name': name,
-    }) as Map<String, dynamic>;
+  Future<String> requestEmailCode({required String email, String? name}) async {
+    final data =
+        await _api.post(
+              '/rider/email/request-code',
+              body: {
+                'email': email,
+                if (name != null && name.isNotEmpty)
+                  'name': NameValidation.normalize(name),
+              },
+            )
+            as Map<String, dynamic>;
     return data['message'] as String? ?? 'Verification code sent.';
   }
 
   /// Resend the code (invalidates the previous one). Same contract.
   Future<String> resendEmailCode({required String email}) async {
-    final data = await _api.post('/rider/email/resend', body: {
-      'email': email,
-    }) as Map<String, dynamic>;
+    final data =
+        await _api.post('/rider/email/resend', body: {'email': email})
+            as Map<String, dynamic>;
     return data['message'] as String? ?? 'Verification code sent.';
   }
 
@@ -188,17 +198,21 @@ class ApplicationService {
     required String email,
     required String code,
   }) async {
-    final data = await _api.post('/rider/email/verify', body: {
-      'email': email,
-      'code': code,
-    }) as Map<String, dynamic>;
+    final data =
+        await _api.post(
+              '/rider/email/verify',
+              body: {'email': email, 'code': code},
+            )
+            as Map<String, dynamic>;
     return data['email'] as String? ?? email;
   }
 
   Future<RiderApplicationStatus?> getStatus(String email) async {
     try {
-      final data = await _api
-          .get('/rider/application-status', query: {'email': email});
+      final data = await _api.get(
+        '/rider/application-status',
+        query: {'email': email},
+      );
       final app = data['application'] as Map?;
       if (app == null) return null;
       return RiderApplicationStatus.fromJson(Map<String, dynamic>.from(app));

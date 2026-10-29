@@ -5,8 +5,11 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/format_utils.dart';
 import '../../models/rider_notification.dart';
 import '../../providers/notification_provider.dart';
+import '../../widgets/app_ui.dart';
 import '../../widgets/error_widget.dart';
 import '../../widgets/loading_widget.dart';
+import '../../widgets/stagger_in.dart';
+import '../deliveries/delivery_detail_screen.dart';
 
 /// Rider notifications list.
 class NotificationsScreen extends StatelessWidget {
@@ -42,18 +45,34 @@ class NotificationsScreen extends StatelessWidget {
     );
   }
 
+  /// Mark read, then open the linked delivery when the notification
+  /// carries one. Delivery ownership stays server-enforced: an
+  /// unauthorized or missing delivery simply shows the detail error
+  /// state instead of leaking data.
+  void _openNotification(BuildContext context, NotificationProvider provider,
+      RiderNotification notification) {
+    provider.markRead(notification.id);
+    final data = notification.data;
+    final rawId = data == null ? null : data['delivery_id'];
+    final deliveryId =
+        rawId is int ? rawId : int.tryParse('${rawId ?? ''}');
+    if (deliveryId == null || deliveryId <= 0) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => DeliveryDetailScreen(deliveryId: deliveryId),
+      ),
+    );
+  }
+
   Widget _buildList(NotificationProvider provider) {
     if (provider.notifications.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         children: const [
           SizedBox(height: 100),
-          Icon(Icons.notifications_none, size: 56, color: AppColors.textSecondary),
-          SizedBox(height: 16),
-          Text(
-            'No notifications yet',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          EmptyState(
+            icon: Icons.notifications_none,
+            title: 'No notifications yet',
           ),
         ],
       );
@@ -65,9 +84,12 @@ class NotificationsScreen extends StatelessWidget {
       itemCount: provider.notifications.length,
       itemBuilder: (context, index) {
         final n = provider.notifications[index];
-        return _NotificationTile(
-          notification: n,
-          onTap: () => provider.markRead(n.id),
+        return StaggerIn(
+          index: index,
+          child: _NotificationTile(
+            notification: n,
+            onTap: () => _openNotification(context, provider, n),
+          ),
         );
       },
     );
@@ -103,52 +125,34 @@ class _NotificationTile extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: isRead
-                      ? AppColors.border
-                      : AppColors.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  icon,
-                  size: 20,
-                  color: isRead
-                      ? AppColors.textSecondary
-                      : AppColors.primary,
-                ),
+              IconTile(
+                icon: icon,
+                size: 42,
+                iconSize: 20,
+                color: isRead
+                    ? AppColors.textSecondary
+                    : AppTheme.primary,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppGaps.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      style: TextStyle(
+                      style: AppText.body.copyWith(
                         fontWeight:
                             isRead ? FontWeight.w500 : FontWeight.w800,
-                        fontSize: 14,
                       ),
                     ),
                     if (body != null && body.isNotEmpty) ...[
                       const SizedBox(height: 4),
-                      Text(
-                        body,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
-                          height: 1.35,
-                        ),
-                      ),
+                      Text(body, style: AppText.secondary),
                     ],
                     const SizedBox(height: 6),
                     Text(
                       FormatUtils.timeAgo(createdAt),
-                      style: const TextStyle(
-                          fontSize: 11, color: AppColors.textSecondary),
+                      style: AppText.caption,
                     ),
                   ],
                 ),

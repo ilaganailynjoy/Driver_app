@@ -8,13 +8,16 @@ import 'providers/auth_provider.dart';
 import 'providers/delivery_provider.dart';
 import 'providers/earnings_provider.dart';
 import 'providers/notification_provider.dart';
+import 'providers/remittance_provider.dart';
 import 'providers/rider_provider.dart';
+import 'screens/auth/forgot_password_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/splash/splash_screen.dart';
 import 'services/deep_link_service.dart';
 import 'services/delivery_service.dart';
 import 'services/earnings_service.dart';
 import 'services/notification_service.dart';
+import 'services/remittance_service.dart';
 import 'services/rider_service.dart';
 import 'widgets/deep_link_broker.dart';
 
@@ -68,6 +71,10 @@ class InvoizeRiderApp extends StatelessWidget {
           create: (_) =>
               EarningsProvider(EarningsService(authProvider.api)),
         ),
+        ChangeNotifierProvider<RemittanceProvider>(
+          create: (_) =>
+              RemittanceProvider(RemittanceService(authProvider.api)),
+        ),
       ],
       child: MaterialApp(
         title: 'Invoize Rider',
@@ -80,6 +87,17 @@ class InvoizeRiderApp extends StatelessWidget {
             return MaterialPageRoute(
               settings: settings,
               builder: (_) => const LoginScreen(),
+            );
+          }
+          if (settings.name == DeepLinkService.resetRouteName) {
+            final args = settings.arguments;
+            final map = args is Map ? args : const {};
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => ForgotPasswordScreen(
+                initialEmail: map['email'] as String?,
+                initialToken: map['token'] as String?,
+              ),
             );
           }
           return null;

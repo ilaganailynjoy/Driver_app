@@ -8,6 +8,8 @@ import '../../core/utils/format_utils.dart';
 import '../../models/conversation.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/message_service.dart';
+import '../../widgets/app_ui.dart';
+import '../../widgets/stagger_in.dart';
 import 'messages_screen.dart';
 
 /// Rider inbox: threads appear automatically from real relationships
@@ -114,6 +116,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
               onChanged: (_) => _onSearchChanged(),
               decoration: InputDecoration(
                 hintText: 'Search conversations...',
+                filled: true,
+                fillColor: AppColors.surfaceSoft,
                 prefixIcon: const Icon(Icons.search_outlined, size: 20),
                 suffixIcon: _search.text.isNotEmpty
                     ? IconButton(
@@ -126,7 +130,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                       )
                     : null,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  borderSide: BorderSide.none,
                 ),
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -176,9 +181,12 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                                     ),
                                   );
                                 }
-                                return _ThreadTile(
-                                  thread: _threads[i],
-                                  onTap: () => _open(_threads[i]),
+                                return StaggerIn(
+                                  index: i,
+                                  child: _ThreadTile(
+                                    thread: _threads[i],
+                                    onTap: () => _open(_threads[i]),
+                                  ),
                                 );
                               },
                             ),
@@ -199,33 +207,18 @@ class _ThreadTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final unread = thread.unread > 0;
-    final initial = thread.name.isNotEmpty
-        ? thread.name.characters.first.toUpperCase()
-        : '?';
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(AppGaps.sm + 2),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: 21,
-                backgroundColor:
-                    AppColors.primary.withValues(alpha: 0.12),
-                child: Text(
-                  initial,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
+              AvatarView(label: thread.name, radius: 21),
+              const SizedBox(width: AppGaps.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -237,8 +230,7 @@ class _ThreadTile extends StatelessWidget {
                             thread.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 14,
+                            style: AppText.body.copyWith(
                               fontWeight: unread
                                   ? FontWeight.w800
                                   : FontWeight.w600,
@@ -248,10 +240,7 @@ class _ThreadTile extends StatelessWidget {
                         const SizedBox(width: 8),
                         Text(
                           FormatUtils.timeAgo(thread.lastMessageAt),
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textSecondary,
-                          ),
+                          style: AppText.caption,
                         ),
                       ],
                     ),
@@ -261,7 +250,7 @@ class _ThreadTile extends StatelessWidget {
                         thread.contextLine,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: AppText.secondary.copyWith(
                           fontSize: 12,
                           color: AppColors.primary,
                           fontWeight: FontWeight.w600,
@@ -275,8 +264,7 @@ class _ThreadTile extends StatelessWidget {
                         thread.preview!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
+                        style: AppText.secondary.copyWith(
                           color: unread
                               ? AppColors.textPrimary
                               : AppColors.textSecondary,
@@ -336,28 +324,37 @@ class _StateMessage extends StatelessWidget {
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
-        const SizedBox(height: 100),
-        Icon(icon, size: 56, color: AppColors.textSecondary),
-        const SizedBox(height: 16),
+        const SizedBox(height: 84),
+        Center(
+          child: Container(
+            width: 76,
+            height: 76,
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+            ),
+            child: Icon(icon, size: 34, color: AppTheme.primary),
+          ),
+        ),
+        const SizedBox(height: AppGaps.lg),
         Text(
           title,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          style: AppText.section.copyWith(fontSize: 17),
         ),
         if (subtitle != null) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: AppGaps.sm),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 48),
             child: Text(
               subtitle!,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 13, color: AppColors.textSecondary),
+              style: AppText.secondary,
             ),
           ),
         ],
         if (actionLabel != null && onAction != null) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: AppGaps.lg),
           Center(
             child: TextButton(
               onPressed: onAction,

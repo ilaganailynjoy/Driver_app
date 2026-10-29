@@ -5,11 +5,18 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/format_utils.dart';
 import '../../core/utils/geolocation.dart';
+import '../../models/conversation.dart';
 import '../../models/delivery.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/delivery_provider.dart';
+import '../../services/message_service.dart';
+import '../../widgets/app_ui.dart';
 import '../../widgets/error_widget.dart';
 import '../../widgets/loading_widget.dart';
+import '../../widgets/stagger_in.dart';
 import '../../widgets/status_badge.dart';
+import '../messages/conversations_screen.dart';
+import '../messages/messages_screen.dart';
 import 'customer_delivery_screen.dart';
 import 'failed_delivery_screen.dart';
 import 'pickup_screen.dart';
@@ -70,23 +77,28 @@ class _DeliveryDetailScreenState extends State<DeliveryDetailScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
           children: [
-            _StatusHeader(delivery: delivery),
+            StaggerIn(index: 0, child: _StatusHeader(delivery: delivery)),
             const SizedBox(height: 16),
-            _ShopSection(delivery: delivery),
+            StaggerIn(index: 1, child: _ShopSection(delivery: delivery)),
             const SizedBox(height: 16),
-            _OrderSection(delivery: delivery),
+            StaggerIn(index: 2, child: _OrderSection(delivery: delivery)),
             const SizedBox(height: 16),
-            _CustomerSection(delivery: delivery),
+            StaggerIn(index: 3, child: _CustomerSection(delivery: delivery)),
             const SizedBox(height: 16),
             if (delivery.statusLogs.isNotEmpty)
-              _TimelineSection(logs: delivery.statusLogs),
+              StaggerIn(
+                  index: 4,
+                  child: _TimelineSection(logs: delivery.statusLogs)),
             const SizedBox(height: 24),
           ],
         ),
       ),
-      bottomNavigationBar: _ActionBar(
-        delivery: delivery,
-        busy: provider.actionBusy,
+      bottomNavigationBar: StaggerIn(
+        index: 5,
+        child: _ActionBar(
+          delivery: delivery,
+          busy: provider.actionBusy,
+        ),
       ),
     );
   }
@@ -101,30 +113,27 @@ class _StatusHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppGaps.lg),
         child: Row(
           children: [
-            const Icon(Icons.local_shipping_outlined,
-                size: 40, color: AppTheme.primary),
-            const SizedBox(width: 14),
+            const IconTile(
+              icon: Icons.local_shipping_outlined,
+              size: 48,
+              iconSize: 24,
+            ),
+            const SizedBox(width: AppGaps.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     delivery.trackingNumber,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                    ),
+                    style: AppText.tracking,
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Order #${delivery.orderId ?? delivery.trackingNumber}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                    ),
+                    style: AppText.secondary.copyWith(fontSize: 12),
                   ),
                 ],
               ),
@@ -359,6 +368,11 @@ class _CustomerSection extends StatelessWidget {
                   ),
               ],
             ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: _MessageBuyerButton(delivery: delivery),
+            ),
           ],
         ),
       ),
@@ -373,6 +387,94 @@ class _CustomerSection extends StatelessWidget {
         const SnackBar(content: Text('Unable to open the dialer.')),
       );
     }
+  }
+}
+
+class _MessageBuyerButton extends StatefulWidget {
+  const _MessageBuyerButton({required this.delivery});
+
+  final Delivery delivery;
+
+  @override
+  State<_MessageBuyerButton> createState() => _MessageBuyerButtonState();
+}
+
+class _MessageBuyerButtonState extends State<_MessageBuyerButton> {
+  bool _busy = false;
+
+  Future<void> _openChat() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final auth = context.read<AuthProvider>();
+      final service = MessageService(auth.api);
+
+      ConversationThread? buyer;
+      ConversationThread? other;
+      var page = 1;
+      var hasMore = true;
+
+      // Per-delivery buyer/seller threads are created by the backend. Match
+      // on order or tracking, preferring an actual buyer thread.
+      while (hasMore && buyer == null && page <= 5) {
+        final result = await service.listConversations(page: page);
+        for (final thread in result.threads) {
+          final sameOrder =
+              widget.delivery.orderId != null &&
+              thread.orderId == widget.delivery.orderId;
+          final sameTracking =
+              thread.tracking != null &&
+              thread.tracking == widget.delivery.trackingNumber;
+          if (!sameOrder && !sameTracking) continue;
+          if (thread.type == 'buyer') {
+            buyer = thread;
+            break;
+          }
+          other ??= thread;
+        }
+        hasMore = result.hasMore;
+        page++;
+      }
+
+      if (!mounted) return;
+      final match = buyer ?? other;
+      if (match != null) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => MessagesScreen(thread: match)),
+        );
+      } else {
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ConversationsScreen()),
+        );
+        if (mounted) {
+          _snack('No buyer conversation exists for this delivery yet.');
+        }
+      }
+    } catch (_) {
+      if (mounted) _snack('Unable to open messages. Please try again.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _snack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: _busy ? null : _openChat,
+      icon: _busy
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.chat_bubble_outline, size: 18),
+      label: Text(_busy ? 'Opening messages…' : 'Message Buyer'),
+      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+    );
   }
 }
 
@@ -394,51 +496,71 @@ class _TimelineSection extends StatelessWidget {
               title: 'Status History',
             ),
             const SizedBox(height: 8),
-            ...logs.map((log) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
+            ...logs.asMap().entries.map((entry) {
+              final log = entry.value;
+              final isLast = entry.key == logs.length - 1;
+              return IntrinsicHeight(
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: StatusBadge.colorFor(log.status),
-                          shape: BoxShape.circle,
+                    // Connected rail: colored node with a line to the next
+                    // event so the journey reads top-to-bottom.
+                    Column(
+                      children: [
+                        const SizedBox(height: 4),
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: StatusBadge.colorFor(log.status),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: StatusBadge.colorFor(log.status)
+                                  .withValues(alpha: 0.3),
+                              width: 2,
+                            ),
+                          ),
                         ),
-                      ),
+                        if (!isLast)
+                          Expanded(
+                            child: Container(
+                              width: 2,
+                              margin: const EdgeInsets.symmetric(vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppColors.border,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            log.status.toUpperCase().replaceAll('_', ' '),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                          ),
-                          if (log.notes != null)
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          bottom: isLast ? 0 : AppGaps.md,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Text(
-                              log.notes!,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
+                              log.status.toUpperCase().replaceAll('_', ' '),
+                              style: AppText.body.copyWith(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                          Text(
-                            FormatUtils.dateTime(log.createdAt),
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textSecondary,
+                            if (log.notes != null)
+                              Text(
+                                log.notes!,
+                                style: AppText.secondary.copyWith(fontSize: 12),
+                              ),
+                            Text(
+                              FormatUtils.dateTime(log.createdAt),
+                              style: AppText.caption,
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -462,6 +584,13 @@ class _ActionBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDone = const ['delivered', 'delivery_failed', 'cancelled']
         .contains(delivery.status);
+
+    // Terminal records stay read-only, except the failed-delivery
+    // next step (re-attempt request / center return), which is valid
+    // until used.
+    if (delivery.status == 'delivery_failed') {
+      return _failedNextStep(context);
+    }
 
     if (isDone) {
       return const SizedBox.shrink();
@@ -601,6 +730,100 @@ class _ActionBar extends StatelessWidget {
     );
   }
 
+  /// Failed-delivery next step: request a re-attempt or return the
+  /// parcel, unless already done. Terminal otherwise.
+  Widget _failedNextStep(BuildContext context) {
+    if (delivery.hasReattemptRequest) {
+      return SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+          child: _custodyBanner(
+            'Re-attempt requested — waiting on Logistics to reassign.',
+          ),
+        ),
+      );
+    }
+    if (delivery.hasCenterReturn) {
+      final center = delivery.destinationCenterName?.isNotEmpty == true
+          ? delivery.destinationCenterName
+          : delivery.handlingCenterName;
+      return SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+          child: _custodyBanner(
+            center != null && center.isNotEmpty
+                ? 'Parcel returned to $center.'
+                : 'Parcel returned to the sorting center.',
+          ),
+        ),
+      );
+    }
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // RID-FAIL-003: a refusal goes straight back; no further attempt.
+            if (delivery.failureReason != 'Customer refused order') ...[
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: busy ? null : () => _nextStep(context, true),
+                  icon: const Icon(Icons.replay_outlined, size: 20),
+                  label: Text(busy ? 'Working...' : 'Request Re-attempt'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: busy ? null : () => _nextStep(context, false),
+                icon: const Icon(Icons.warehouse_outlined, size: 20),
+                label: Text(
+                  busy ? 'Working...' : 'Return to Sorting Center (RTS)',
+                ),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _nextStep(BuildContext context, bool reattempt) async {
+    final provider = context.read<DeliveryProvider>();
+    final ok = reattempt
+        ? await provider.requestReattempt(delivery.id)
+        : await provider.returnToCenter(delivery.id);
+    if (!context.mounted) return;
+    if (ok) {
+      provider.loadDetail(delivery.id);
+      _snack(
+          context,
+          reattempt
+              ? 'Re-attempt requested. Logistics will review and reassign.'
+              : 'Parcel marked as returned to the sorting center.');
+    } else {
+      _snack(
+          context,
+          provider.error ??
+              (reattempt
+                  ? 'Unable to request a re-attempt.'
+                  : 'Unable to return the parcel.'));
+    }
+  }
+
   /// Shared green confirmation chip for sorting-center custody states.
   /// Callers provide the outer SafeArea/insets.
   Widget _custodyBanner(String message) {
@@ -612,12 +835,14 @@ class _ActionBar extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.success.withValues(alpha: 0.18)),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.check_circle_outline,
-              size: 18, color: AppColors.success),
-          const SizedBox(width: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const PopIn(
+                child: Icon(Icons.check_circle_outline,
+                    size: 18, color: AppColors.success),
+              ),
+              const SizedBox(width: 8),
           Flexible(
             child: Text(message,
                 textAlign: TextAlign.center,
@@ -655,6 +880,7 @@ class _ActionBar extends StatelessWidget {
       case 'assigned':
         return _Action('Accept Delivery', Icons.check_circle_outline);
       case 'accepted':
+        return _Action('Head to Shop', Icons.storefront_outlined);
       case 'going_to_pickup':
         return _Action('I Arrived at Shop', Icons.storefront_outlined);
       case 'arrived_at_shop':
@@ -735,8 +961,10 @@ class _ActionBar extends StatelessWidget {
             });
         break;
       case 'accepted':
-      case 'going_to_pickup':
         _update(context, 'going_to_pickup', 'Heading to the shop...');
+        break;
+      case 'going_to_pickup':
+        _update(context, 'arrived_at_shop', 'Arrived at the shop.');
         break;
       case 'arrived_at_shop':
         Navigator.of(context).push(
@@ -867,12 +1095,9 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 20, color: AppTheme.primary),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-        ),
+        IconTile(icon: icon, size: 34, iconSize: 18),
+        const SizedBox(width: AppGaps.sm),
+        Text(title, style: AppText.section),
       ],
     );
   }
@@ -893,8 +1118,7 @@ class _InfoRow extends StatelessWidget {
           width: 110,
           child: Text(
             label,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
+            style: AppText.secondary.copyWith(
               fontSize: 13,
               fontWeight: FontWeight.w500,
             ),
@@ -903,11 +1127,9 @@ class _InfoRow extends StatelessWidget {
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
+            style: AppText.body.copyWith(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-              height: 1.35,
             ),
           ),
         ),

@@ -21,10 +21,10 @@ class DeliveryService {
   /// List the rider's deliveries. [filter] can be:
   /// all | new | accepted | pickup | in_transit | delivered | failed | cancelled
   Future<DeliveryPage> list({String filter = 'all', int page = 1}) async {
-    final data = await _api.get('/rider/deliveries', query: {
-      'status': filter,
-      'page': page,
-    });
+    final data = await _api.get(
+      '/rider/deliveries',
+      query: {'status': filter, 'page': page},
+    );
 
     List<Delivery> list = [];
     if (data['deliveries'] is List) {
@@ -34,7 +34,8 @@ class DeliveryService {
           .toList();
     }
 
-    final total = (data['pagination']?['total'] as num?)?.toInt() ?? list.length;
+    final total =
+        (data['pagination']?['total'] as num?)?.toInt() ?? list.length;
 
     return DeliveryPage(deliveries: list, total: total);
   }
@@ -42,7 +43,8 @@ class DeliveryService {
   Future<Delivery> detail(int id) async {
     final data = await _api.get('/rider/deliveries/$id');
     return Delivery.fromJson(
-        Map<String, dynamic>.from(data['delivery'] as Map? ?? {}));
+      Map<String, dynamic>.from(data['delivery'] as Map? ?? {}),
+    );
   }
 
   /// Find the rider's delivery by the tracking number scanned from an INVOIZ
@@ -56,37 +58,44 @@ class DeliveryService {
   /// [detail]: `404` when no delivery matches, `403` when the delivery
   /// exists but this rider may not access it.
   Future<Delivery> lookupByTracking(String trackingNumber) async {
-    final data = await _api.get('/rider/deliveries/lookup', query: {
-      'tracking_number': trackingNumber,
-    });
+    final data = await _api.get(
+      '/rider/deliveries/lookup',
+      query: {'tracking_number': trackingNumber},
+    );
     return Delivery.fromJson(
-        Map<String, dynamic>.from(data['delivery'] as Map? ?? {}));
+      Map<String, dynamic>.from(data['delivery'] as Map? ?? {}),
+    );
   }
 
   Future<Delivery> accept(int id) async {
     final data = await _api.post('/rider/deliveries/$id/accept');
     return Delivery.fromJson(
-        Map<String, dynamic>.from(data['delivery'] as Map? ?? {}));
+      Map<String, dynamic>.from(data['delivery'] as Map? ?? {}),
+    );
   }
 
   Future<Delivery> updateStatus(int id, String status) async {
-    final data = await _api.patch('/rider/deliveries/$id/status', body: {
-      'status': status,
-    });
+    final data = await _api.patch(
+      '/rider/deliveries/$id/status',
+      body: {'status': status},
+    );
     return Delivery.fromJson(
-        Map<String, dynamic>.from(data['delivery'] as Map? ?? {}));
+      Map<String, dynamic>.from(data['delivery'] as Map? ?? {}),
+    );
   }
 
   Future<Delivery> pickup(int id, {String? pickupPin}) async {
-    final data = await _api.post('/rider/deliveries/$id/pickup', body: {
-      'pickup_pin': ?pickupPin,
-    });
+    final data = await _api.post(
+      '/rider/deliveries/$id/pickup',
+      body: {'pickup_pin': ?pickupPin},
+    );
     return Delivery.fromJson(
-        Map<String, dynamic>.from(data['delivery'] as Map? ?? {}));
+      Map<String, dynamic>.from(data['delivery'] as Map? ?? {}),
+    );
   }
 
-  /// Complete a delivery. Supports photo proof via [photoBytes] and COD
-  /// settlement via [amountReceived].
+  /// Complete a delivery. Buyer-backed deliveries require the 6-digit [otp]
+  /// issued by the backend; photo proof and COD settlement remain unchanged.
   Future<Delivery> complete(
     int id, {
     String proofType = 'signature',
@@ -122,7 +131,8 @@ class DeliveryService {
     }
 
     return Delivery.fromJson(
-        Map<String, dynamic>.from(data['delivery'] as Map? ?? {}));
+      Map<String, dynamic>.from(data['delivery'] as Map? ?? {}),
+    );
   }
 
   Future<Delivery> failed(
@@ -130,25 +140,48 @@ class DeliveryService {
     required String reason,
     String? notes,
   }) async {
-    final data = await _api.post('/rider/deliveries/$id/failed', body: {
-      'reason': reason,
-      if (notes != null && notes.isNotEmpty) 'notes': notes,
-    });
+    final data = await _api.post(
+      '/rider/deliveries/$id/failed',
+      body: {
+        'reason': reason,
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
+      },
+    );
     return Delivery.fromJson(
-        Map<String, dynamic>.from(data['delivery'] as Map? ?? {}));
+      Map<String, dynamic>.from(data['delivery'] as Map? ?? {}),
+    );
+  }
+
+  /// Request a re-attempt of a failed delivery. Status stays failed;
+  /// Logistics reassigns through the existing flow.
+  Future<Delivery> requestReattempt(int id) async {
+    final data = await _api.post('/rider/deliveries/$id/reattempt');
+    return Delivery.fromJson(
+      Map<String, dynamic>.from(data['delivery'] as Map? ?? {}),
+    );
+  }
+
+  /// Return a failed parcel to the sorting center.
+  Future<Delivery> returnToCenter(int id) async {
+    final data = await _api.post('/rider/deliveries/$id/return-to-center');
+    return Delivery.fromJson(
+      Map<String, dynamic>.from(data['delivery'] as Map? ?? {}),
+    );
   }
 
   Future<Delivery> sortingCenterHandoff(int id) async {
-    final data =
-        await _api.post('/rider/deliveries/$id/sorting-center-handoff');
+    final data = await _api.post(
+      '/rider/deliveries/$id/sorting-center-handoff',
+    );
     return Delivery.fromJson(
-        Map<String, dynamic>.from(data['delivery'] as Map? ?? {}));
+      Map<String, dynamic>.from(data['delivery'] as Map? ?? {}),
+    );
   }
 
   Future<Delivery> sortingCenterPickup(int id) async {
-    final data =
-        await _api.post('/rider/deliveries/$id/sorting-center-pickup');
+    final data = await _api.post('/rider/deliveries/$id/sorting-center-pickup');
     return Delivery.fromJson(
-        Map<String, dynamic>.from(data['delivery'] as Map? ?? {}));
+      Map<String, dynamic>.from(data['delivery'] as Map? ?? {}),
+    );
   }
 }

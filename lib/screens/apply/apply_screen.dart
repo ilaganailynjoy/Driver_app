@@ -7,6 +7,9 @@ import 'package:flutter/services.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/file_validation.dart';
+import '../../core/utils/input_validation.dart';
+import '../../core/utils/name_validation.dart';
 import '../../core/utils/vehicle_icons.dart';
 import '../../services/address_service.dart';
 import '../../services/application_service.dart';
@@ -51,8 +54,11 @@ class DocFilePicker {
 }
 
 class ApplyScreen extends StatefulWidget {
-  const ApplyScreen(
-      {super.key, this.picker = const DocFilePicker(), this.apiClient});
+  const ApplyScreen({
+    super.key,
+    this.picker = const DocFilePicker(),
+    this.apiClient,
+  });
 
   /// Shared API client (injectable in tests; defaults to a live client).
   final ApiClient? apiClient;
@@ -119,6 +125,7 @@ class _ApplyScreenState extends State<ApplyScreen> {
   final _plate = TextEditingController();
   final _licenseNo = TextEditingController();
   final _vehicleReg = TextEditingController();
+  DateTime? _licenseExpiry;
 
   // Steps 4–5 — staged document files (uploaded on submit).
   final Map<String, ({Uint8List bytes, String filename})> _docs = {};
@@ -126,6 +133,7 @@ class _ApplyScreenState extends State<ApplyScreen> {
   // Step 6 — review.
   bool _confirm = false;
   bool _submitting = false;
+  bool _showErrors = false;
 
   static const _ownershipOptions = <String, String>{
     'own': 'Own',
@@ -135,13 +143,24 @@ class _ApplyScreenState extends State<ApplyScreen> {
   };
 
   static const _baseDocs = [
-    _DocSlot('drivers_license', "Driver's License",
-        'Front and back, clear and readable', Icons.badge_outlined),
-    _DocSlot('vehicle_registration', 'OR/CR',
-        'Official Receipt / Certificate of Registration',
-        Icons.directions_car_outlined),
-    _DocSlot('valid_id', 'Valid ID',
-        'Government-issued ID with photo', Icons.credit_card_outlined),
+    _DocSlot(
+      'drivers_license',
+      "Driver's License",
+      'Front and back, clear and readable',
+      Icons.badge_outlined,
+    ),
+    _DocSlot(
+      'vehicle_registration',
+      'OR/CR',
+      'Official Receipt / Certificate of Registration',
+      Icons.directions_car_outlined,
+    ),
+    _DocSlot(
+      'valid_id',
+      'Valid ID',
+      'Government-issued ID with photo',
+      Icons.credit_card_outlined,
+    ),
   ];
 
   @override
@@ -194,27 +213,85 @@ class _ApplyScreenState extends State<ApplyScreen> {
   }
 
   List<VehicleType> get _fallbackVehicles => const [
-        VehicleType(name: 'motorcycle', label: 'Motorcycle', capacityKg: 30),
-        VehicleType(name: 'car', label: 'Car / Sedan', capacityKg: 100),
-        VehicleType(name: 'van', label: 'Van', capacityKg: 300),
-        VehicleType(name: 'truck', label: 'Truck', capacityKg: 500),
-      ];
+    VehicleType(name: 'motorcycle', label: 'Motorcycle', capacityKg: 30),
+    VehicleType(name: 'car', label: 'Car / Sedan', capacityKg: 100),
+    VehicleType(name: 'van', label: 'Van', capacityKg: 300),
+    VehicleType(name: 'truck', label: 'Truck', capacityKg: 500),
+  ];
 
-  int get _age {
-    if (_dob == null) return 0;
-    final now = DateTime.now();
-    int age = now.year - _dob!.year;
-    if (now.month < _dob!.month ||
-        (now.month == _dob!.month && now.day < _dob!.day)) {
-      age--;
+  int get _age => _dob == null ? 0 : AgeValidation.ageOn(_dob!);
+
+  bool get _hasUnsavedData =>
+      _step > 0 ||
+      _firstName.text.trim().isNotEmpty ||
+      _middleInitial.text.trim().isNotEmpty ||
+      _lastName.text.trim().isNotEmpty ||
+      _email.text.trim().isNotEmpty ||
+      _phone.text.trim().isNotEmpty ||
+      _otpCode.text.isNotEmpty ||
+      _plate.text.trim().isNotEmpty ||
+      _licenseNo.text.trim().isNotEmpty ||
+      _vehicleReg.text.trim().isNotEmpty ||
+      _dob != null ||
+      _sex != null ||
+      _addressSel != null ||
+      _docs.isNotEmpty;
+
+  /// Field-level messages are only surfaced after the first Continue/Submit
+  /// attempt, so a fresh form never opens covered in red.
+  String? get _firstNameError {
+    if (!_showErrors) return null;
+    if (_firstName.text.trim().isEmpty) return 'Please enter your first name.';
+    if (!NameValidation.isValidPerson(_firstName.text, maxLength: 50)) {
+      return 'Please enter a valid first name.';
     }
-    return age;
+    return null;
   }
 
+  String? get _lastNameError {
+    if (!_showErrors) return null;
+    if (_lastName.text.trim().isEmpty) return 'Please enter your last name.';
+    if (!NameValidation.isValidPerson(_lastName.text, maxLength: 50)) {
+      return 'Please enter a valid last name.';
+    }
+    return null;
+  }
+
+  String? get _middleInitialError {
+    if (!_showErrors || _middleInitial.text.trim().isEmpty) return null;
+    return NameValidation.isValidPerson(_middleInitial.text, maxLength: 5)
+        ? null
+        : 'Please enter a valid middle initial.';
+  }
+
+  String? get _phoneError =>
+      _showErrors ? PhilippineMobile.validate(_phone.text) : null;
+
+  String? get _emailError {
+    if (!_showErrors) return null;
+    final email = _email.text.trim();
+    if (email.isEmpty) return 'Please enter your email address.';
+    if (!_emailRegex.hasMatch(email)) {
+      return 'Please enter a valid email address.';
+    }
+    return null;
+  }
+
+  String? get _plateError =>
+      _showErrors ? LicensePlate.validate(_plate.text) : null;
+
+  String? get _licenseError =>
+      _showErrors ? LicenseNumber.validate(_licenseNo.text) : null;
+
+  String? get _vehicleRegistrationError =>
+      _showErrors ? VehicleRegistration.validate(_vehicleReg.text) : null;
+
   String _fullDisplayName() {
-    final first = _firstName.text.trim();
-    final middle = _middleInitial.text.trim();
-    final last = _lastName.text.trim();
+    final first = NameValidation.normalize(_firstName.text);
+    final middle = NameValidation.normalize(
+      _middleInitial.text,
+    ).replaceAll(RegExp(r'\.+$'), '');
+    final last = NameValidation.normalize(_lastName.text);
     if (middle.isNotEmpty) return '$first $middle. $last';
     return '$first $last';
   }
@@ -227,30 +304,63 @@ class _ApplyScreenState extends State<ApplyScreen> {
     final docs = [..._baseDocs];
     docs.add(
       _isFullTime
-          ? const _DocSlot('other', 'Police or Barangay Clearance',
+          ? const _DocSlot(
+              'other',
+              'Police or Barangay Clearance',
               'Valid clearance issued within the last 6 months',
-              Icons.verified_outlined)
-          : const _DocSlot('other', 'Barangay Clearance',
-              'Valid clearance from your barangay', Icons.verified_outlined),
+              Icons.verified_outlined,
+            )
+          : const _DocSlot(
+              'other',
+              'Barangay Clearance',
+              'Valid clearance from your barangay',
+              Icons.verified_outlined,
+            ),
     );
     switch (_ownership) {
       case 'borrowed':
-        docs.add(const _DocSlot('authorization_letter',
-            'Authorization Letter', 'Signed letter from the vehicle owner',
-            Icons.edit_note_outlined));
-        docs.add(const _DocSlot('owner_valid_id', "Owner's Valid ID",
+        docs.add(
+          const _DocSlot(
+            'authorization_letter',
+            'Authorization Letter',
+            'Signed letter from the vehicle owner',
+            Icons.edit_note_outlined,
+          ),
+        );
+        docs.add(
+          const _DocSlot(
+            'owner_valid_id',
+            "Owner's Valid ID",
             'Government-issued ID of the vehicle owner',
-            Icons.person_outline));
+            Icons.person_outline,
+          ),
+        );
       case 'second_hand':
-        docs.add(const _DocSlot('deed_of_sale', 'Deed of Sale',
-            'Notarized proof of vehicle purchase', Icons.receipt_outlined));
+        docs.add(
+          const _DocSlot(
+            'deed_of_sale',
+            'Deed of Sale',
+            'Notarized proof of vehicle purchase',
+            Icons.receipt_outlined,
+          ),
+        );
       case 'financing':
-        docs.add(const _DocSlot('sales_invoice', 'Sales Invoice',
+        docs.add(
+          const _DocSlot(
+            'sales_invoice',
+            'Sales Invoice',
             'Invoice from the dealer or financing company',
-            Icons.request_quote_outlined));
-        docs.add(const _DocSlot('encumbrance_certificate',
-            'Encumbrance Certificate', 'Certification from the financing company',
-            Icons.account_balance_outlined));
+            Icons.request_quote_outlined,
+          ),
+        );
+        docs.add(
+          const _DocSlot(
+            'encumbrance_certificate',
+            'Encumbrance Certificate',
+            'Certification from the financing company',
+            Icons.account_balance_outlined,
+          ),
+        );
       case 'own':
         break;
     }
@@ -260,8 +370,7 @@ class _ApplyScreenState extends State<ApplyScreen> {
   String get _riderTypeLabel =>
       _isFullTime ? 'Full-time Rider' : 'Part-time Rider';
 
-  String get _ownershipLabel =>
-      _ownershipOptions[_ownership] ?? _ownership;
+  String get _ownershipLabel => _ownershipOptions[_ownership] ?? _ownership;
 
   String get _vehicleLabel {
     for (final v in _vehicles) {
@@ -279,29 +388,55 @@ class _ApplyScreenState extends State<ApplyScreen> {
   }
 
   void _snack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg)),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   // ── Navigation + per-step validation ────────────────────────────────
 
+  void _showValidationError(String error) {
+    final shownInline = <String?>[
+      _firstNameError,
+      _middleInitialError,
+      _lastNameError,
+      _emailError,
+      _phoneError,
+      _plateError,
+      _licenseError,
+      _vehicleRegistrationError,
+    ].contains(error);
+    if (!shownInline) _snack(error);
+  }
+
   void _next() {
+    setState(() => _showErrors = true);
     final error = _validateStep();
     if (error != null) {
-      _snack(error);
+      _showValidationError(error);
       return;
     }
     FocusScope.of(context).unfocus();
-    if (_step < 5) setState(() => _step++);
+    if (_step < 5) {
+      setState(() {
+        _step++;
+        _showErrors = false;
+      });
+    }
   }
 
   void _back() {
     FocusScope.of(context).unfocus();
-    if (_step > 0) setState(() => _step--);
+    if (_step > 0) {
+      setState(() {
+        _step--;
+        _showErrors = false;
+      });
+    }
   }
 
-  void _jumpTo(int step) => setState(() => _step = step);
+  void _jumpTo(int step) => setState(() {
+    _step = step;
+    _showErrors = false;
+  });
 
   String? _validateStep() {
     switch (_step) {
@@ -316,8 +451,9 @@ class _ApplyScreenState extends State<ApplyScreen> {
     }
   }
 
-  static final _emailRegex =
-      RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+  static final _emailRegex = RegExp(
+    r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+  );
 
   ApplicationService get _appService =>
       ApplicationService(widget.apiClient ?? ApiClient());
@@ -331,12 +467,13 @@ class _ApplyScreenState extends State<ApplyScreen> {
     if (_sendingCode) return;
     setState(() => _sendingCode = true);
     try {
-      final name =
-          '${_firstName.text.trim()} ${_lastName.text.trim()}'.trim();
+      final name = '${_firstName.text.trim()} ${_lastName.text.trim()}'.trim();
       final message = resend
           ? await _appService.resendEmailCode(email: email)
           : await _appService.requestEmailCode(
-              email: email, name: name.isEmpty ? null : name);
+              email: email,
+              name: name.isEmpty ? null : name,
+            );
       if (!mounted) return;
       setState(() {
         _codeSentTo = email;
@@ -395,15 +532,25 @@ class _ApplyScreenState extends State<ApplyScreen> {
 
   String? _validatePersonal() {
     if (_firstName.text.trim().isEmpty) return 'Please enter your first name.';
+    if (!NameValidation.isValidPerson(_firstName.text, maxLength: 50)) {
+      return 'Please enter a valid first name.';
+    }
+    if (_middleInitial.text.trim().isNotEmpty &&
+        !NameValidation.isValidPerson(_middleInitial.text, maxLength: 5)) {
+      return 'Please enter a valid middle initial.';
+    }
     if (_lastName.text.trim().isEmpty) return 'Please enter your last name.';
+    if (!NameValidation.isValidPerson(_lastName.text, maxLength: 50)) {
+      return 'Please enter a valid last name.';
+    }
     if (!_emailRegex.hasMatch(_email.text.trim())) {
       return 'Please enter a valid email address.';
     }
     if (!_isEmailVerified) {
       return 'Please verify your email address first.';
     }
-    final digits = _phone.text.replaceAll(RegExp(r'\D'), '');
-    if (digits.length < 10) return 'Please enter a valid phone number.';
+    final phoneError = PhilippineMobile.validate(_phone.text);
+    if (phoneError != null) return phoneError;
     if (_sex == null) return 'Please select your sex.';
     if (_dob == null) return 'Please select your date of birth.';
     if (_age < 18) return 'You must be at least 18 years old to apply.';
@@ -417,19 +564,25 @@ class _ApplyScreenState extends State<ApplyScreen> {
     if (_loadingVehicles || _vehicleType == null) {
       return 'Please wait while vehicle types load.';
     }
-    if (_plate.text.trim().isEmpty) return 'Please enter the license plate.';
-    if (_licenseNo.text.trim().isEmpty) {
-      return 'Please enter the license number.';
+    final plateError = LicensePlate.validate(_plate.text);
+    if (plateError != null) return plateError;
+    final licenseError = LicenseNumber.validate(_licenseNo.text);
+    if (licenseError != null) return licenseError;
+    if (_licenseExpiry == null) {
+      return 'Please select the license expiry date.';
     }
-    if (_vehicleReg.text.trim().isEmpty) {
-      return 'Please enter the vehicle registration.';
+    if (_licenseExpiry!.isBefore(DateTime.now())) {
+      return 'License expiry date must be today or in the future.';
     }
+    final registrationError = VehicleRegistration.validate(_vehicleReg.text);
+    if (registrationError != null) return registrationError;
     return null;
   }
 
   String? _validateDocs() {
-    final missing =
-        _requiredDocs.where((d) => !_docs.containsKey(d.key)).toList();
+    final missing = _requiredDocs
+        .where((d) => !_docs.containsKey(d.key))
+        .toList();
     if (missing.isNotEmpty) {
       return 'Please upload: ${missing.map((d) => d.title).join(', ')}.';
     }
@@ -444,33 +597,37 @@ class _ApplyScreenState extends State<ApplyScreen> {
       // Single-file picker limited to the supported document formats.
       // The original filename + extension are preserved as-is for the
       // multipart upload on submit.
-      picked = await widget.picker
-          .pickSingle(ApplyScreen.supportedDocExtensions);
+      picked = await widget.picker.pickSingle(
+        ApplyScreen.supportedDocExtensions,
+      );
     } catch (e, stack) {
       // Never hide the underlying failure during development.
       debugPrint('Document picker failed to open: $e\n$stack');
       if (!mounted) return;
-      _snack(e is MissingPluginException
-          ? 'File picking is not available in this app build. Please reinstall the latest version of the app.'
-          : 'Unable to open the file picker. Please try again.');
+      _snack(
+        e is MissingPluginException
+            ? 'File picking is not available in this app build. Please reinstall the latest version of the app.'
+            : 'Unable to open the file picker. Please try again.',
+      );
       return;
     }
     // User cancelled the picker — normal behavior, stay silent.
     if (picked == null) return;
     try {
       final bytes = await picked.readBytes();
-      if (bytes.length > ApplyScreen.maxDocBytes) {
-        if (mounted) {
-          _snack(
-              'That file is over 5 MB. Please choose a smaller file or take a new photo.');
-        }
+      final result = FileContentValidation.validateDocument(
+        filename: picked.name,
+        bytes: bytes,
+      );
+      if (!result.isValid) {
+        if (mounted) _snack(result.message!);
         return;
       }
       if (!mounted) return;
       setState(() => _docs[key] = (bytes: bytes, filename: picked!.name));
     } catch (e, stack) {
       debugPrint('Document read failed: $e\n$stack');
-      if (mounted) _snack('Document upload failed. Please try again.');
+      if (mounted) _snack('Unable to read that document. Please try again.');
     }
   }
 
@@ -494,41 +651,66 @@ class _ApplyScreenState extends State<ApplyScreen> {
     if (picked != null && mounted) setState(() => _dob = picked);
   }
 
+  Future<void> _pickLicenseExpiry() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _licenseExpiry ?? DateTime(now.year + 1),
+      firstDate: now,
+      lastDate: DateTime(now.year + 20),
+      helpText: 'Select License Expiry Date',
+    );
+    if (picked != null && mounted) setState(() => _licenseExpiry = picked);
+  }
+
   // ── Submission (existing POST /api/rider/apply) ─────────────────────
 
   Future<void> _submit() async {
     if (_submitting) return; // prevent duplicate submissions
-    for (final error in [_validatePersonal(), _validateVehicle(), _validateDocs()]) {
+    setState(() => _showErrors = true);
+    for (final error in [
+      _validatePersonal(),
+      _validateVehicle(),
+      _validateDocs(),
+    ]) {
       if (error != null) {
-        _snack(error);
+        _showValidationError(error);
         return;
       }
     }
     if (!_confirm) {
-      _snack('Please confirm that your information is accurate.');
+      _snack(
+        'Please confirm your information and agree to the Terms and Privacy Policy.',
+      );
       return;
     }
     setState(() => _submitting = true);
     try {
-      final result = await ApplicationService(ApiClient()).submit(
+      final result = await _appService.submit(
         name: _fullDisplayName(),
         email: _email.text.trim(),
-        phone: _phone.text.trim(),
+        phone: PhilippineMobile.normalize(_phone.text),
         address: _addressSel?.composed ?? '',
         vehicleType: _vehicleType ?? '',
-        licensePlate: _plate.text.trim(),
-        licenseNumber: _licenseNo.text.trim(),
-        vehicleRegistration: _vehicleReg.text.trim(),
+        licensePlate: LicensePlate.normalize(_plate.text),
+        licenseNumber: LicenseNumber.normalize(_licenseNo.text),
+        licenseExpiry: _licenseExpiry == null
+            ? ''
+            : '${_licenseExpiry!.year.toString().padLeft(4, '0')}-'
+                  '${_licenseExpiry!.month.toString().padLeft(2, '0')}-'
+                  '${_licenseExpiry!.day.toString().padLeft(2, '0')}',
+        vehicleRegistration: VehicleRegistration.normalize(_vehicleReg.text),
         riderType: _riderType,
         vehicleOwnership: _ownership,
+        acceptedTerms: _confirm,
         documents: _docs,
         middleInitial: _middleInitial.text.trim(),
         sex: _sex,
         birthday: _dob == null
             ? null
             : '${_dob!.year.toString().padLeft(4, '0')}-'
-                '${_dob!.month.toString().padLeft(2, '0')}-'
-                '${_dob!.day.toString().padLeft(2, '0')}',
+                  '${_dob!.month.toString().padLeft(2, '0')}-'
+                  '${_dob!.day.toString().padLeft(2, '0')}',
         houseNumber: _addressSel?.houseNumber ?? '',
         street: _addressSel?.street ?? '',
         barangay: _addressSel?.barangay?.name ?? '',
@@ -546,16 +728,20 @@ class _ApplyScreenState extends State<ApplyScreen> {
       if (!mounted) return;
       switch (e.type) {
         case ApiErrorType.validation:
-          _snack(e.message.isNotEmpty
-              ? e.message
-              : 'Please complete the required fields.');
+          _snack(
+            e.message.isNotEmpty
+                ? e.message
+                : 'Please complete the required fields.',
+          );
         case ApiErrorType.network:
         case ApiErrorType.timeout:
           _snack('Unable to connect. Please try again.');
         default:
-          _snack(e.message.isNotEmpty
-              ? e.message
-              : 'Submission failed. Please try again.');
+          _snack(
+            e.message.isNotEmpty
+                ? e.message
+                : 'Submission failed. Please try again.',
+          );
       }
     } catch (_) {
       if (mounted) _snack('Submission failed. Please try again.');
@@ -584,33 +770,62 @@ class _ApplyScreenState extends State<ApplyScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Apply as Rider')),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-              child: ApplyProgressIndicator(step: _step),
+    return PopScope(
+      canPop: !_hasUnsavedData || _submitting,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop || !mounted) return;
+        final leave = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Discard application?'),
+            content: const Text(
+              'Your application details have not been submitted. '
+              'If you leave now, what you entered will be lost.',
             ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  child: _buildStep(),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Keep Editing'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Discard'),
+              ),
+            ],
+          ),
+        );
+        if (leave == true && context.mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Apply as Rider')),
+        body: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                child: ApplyProgressIndicator(step: _step),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: _buildStep(),
+                  ),
                 ),
               ),
-            ),
-            Container(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                border: Border(top: BorderSide(color: AppColors.border)),
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(top: BorderSide(color: AppColors.border)),
+                ),
+                child: _buildNavBar(),
               ),
-              child: _buildNavBar(),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -663,18 +878,58 @@ class _ApplyScreenState extends State<ApplyScreen> {
         const SizedBox(height: 20),
         Row(
           children: [
-            Expanded(child: _field(_firstName, 'First Name *', Icons.person_outline)),
+            Expanded(
+              child: _field(
+                _firstName,
+                'First Name *',
+                Icons.person_outline,
+                maxLength: 50,
+                errorText: _firstNameError,
+                capitalization: TextCapitalization.words,
+                autofillHints: const [AutofillHints.givenName],
+                action: TextInputAction.next,
+              ),
+            ),
             const SizedBox(width: 12),
             SizedBox(
               width: 84,
-              child: _field(_middleInitial, 'M.I.', null),
+              child: _field(
+                _middleInitial,
+                'M.I.',
+                null,
+                maxLength: 5,
+                errorText: _middleInitialError,
+                capitalization: TextCapitalization.characters,
+                action: TextInputAction.next,
+              ),
             ),
             const SizedBox(width: 12),
-            Expanded(child: _field(_lastName, 'Last Name *', null)),
+            Expanded(
+              child: _field(
+                _lastName,
+                'Last Name *',
+                null,
+                maxLength: 50,
+                errorText: _lastNameError,
+                capitalization: TextCapitalization.words,
+                autofillHints: const [AutofillHints.familyName],
+                action: TextInputAction.next,
+              ),
+            ),
           ],
         ),
-        _field(_email, 'Email Address *', Icons.email_outlined,
-            keyboard: TextInputType.emailAddress),
+        _field(
+          _email,
+          'Email Address *',
+          Icons.email_outlined,
+          keyboard: TextInputType.emailAddress,
+          maxLength: 254,
+          errorText: _emailError,
+          autocorrect: false,
+          capitalization: TextCapitalization.none,
+          autofillHints: const [AutofillHints.email],
+          action: TextInputAction.next,
+        ),
         const Padding(
           padding: EdgeInsets.only(bottom: 12),
           child: Text(
@@ -683,13 +938,28 @@ class _ApplyScreenState extends State<ApplyScreen> {
           ),
         ),
         _emailVerificationSection(),
-        _field(_phone, 'Phone Number *  (+639 / 09)', Icons.phone_outlined,
-            keyboard: TextInputType.phone),
-        const Text('Sex *',
-            style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary)),
+        _field(
+          _phone,
+          'Phone Number *  (+639 / 09)',
+          Icons.phone_outlined,
+          keyboard: TextInputType.phone,
+          maxLength: 16,
+          errorText: _phoneError,
+          hint: '09171234567',
+          autofillHints: const [AutofillHints.telephoneNumber],
+          action: TextInputAction.next,
+          formatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[0-9+\s()-]')),
+          ],
+        ),
+        const Text(
+          'Sex *',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
         const SizedBox(height: 8),
         Row(
           children: [
@@ -709,23 +979,33 @@ class _ApplyScreenState extends State<ApplyScreen> {
           ),
           child: const Row(
             children: [
-              Icon(Icons.info_outline, size: 16, color: AppColors.textSecondary),
+              Icon(
+                Icons.info_outline,
+                size: 16,
+                color: AppColors.textSecondary,
+              ),
               SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Applicants must be at least 18 years old.',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ),
             ],
           ),
         ),
         const SizedBox(height: 16),
-        const Text('Address *',
-            style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary)),
+        const Text(
+          'Address *',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
         const SizedBox(height: 8),
         AddressFields(
           onChanged: (sel) => setState(() => _addressSel = sel),
@@ -746,13 +1026,15 @@ class _ApplyScreenState extends State<ApplyScreen> {
           decoration: BoxDecoration(
             color: AppColors.success.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-                color: AppColors.success.withValues(alpha: 0.4)),
+            border: Border.all(color: AppColors.success.withValues(alpha: 0.4)),
           ),
           child: Row(
             children: [
-              const Icon(Icons.check_circle,
-                  size: 20, color: AppColors.success),
+              const Icon(
+                Icons.check_circle,
+                size: 20,
+                color: AppColors.success,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -820,6 +1102,15 @@ class _ApplyScreenState extends State<ApplyScreen> {
                 controller: _otpCode,
                 keyboardType: TextInputType.number,
                 maxLength: 6,
+                textInputAction: TextInputAction.done,
+                autofillHints: const [AutofillHints.oneTimeCode],
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(6),
+                ],
+                onChanged: (_) {
+                  if (_showErrors && mounted) setState(() {});
+                },
                 decoration: const InputDecoration(
                   labelText: 'Verification Code',
                   hintText: 'Enter 6-digit code',
@@ -830,8 +1121,7 @@ class _ApplyScreenState extends State<ApplyScreen> {
               SizedBox(
                 height: 52,
                 child: ElevatedButton(
-                  onPressed:
-                      _verifyingCode ? null : _verifyCode,
+                  onPressed: _verifyingCode ? null : _verifyCode,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
@@ -848,9 +1138,10 @@ class _ApplyScreenState extends State<ApplyScreen> {
                             color: Colors.white,
                           ),
                         )
-                      : const Text('Verify Email',
-                          style:
-                              TextStyle(fontWeight: FontWeight.w600)),
+                      : const Text(
+                          'Verify Email',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
                 ),
               ),
               const SizedBox(height: 8),
@@ -871,17 +1162,14 @@ class _ApplyScreenState extends State<ApplyScreen> {
               SizedBox(
                 height: 52,
                 child: OutlinedButton.icon(
-                  onPressed:
-                      _sendingCode ? null : () => _sendCode(),
-                  icon: const Icon(Icons.mark_email_read_outlined,
-                      size: 20),
-                  label: Text(_sendingCode
-                      ? 'Sending...'
-                      : 'Send Verification Code'),
+                  onPressed: _sendingCode ? null : () => _sendCode(),
+                  icon: const Icon(Icons.mark_email_read_outlined, size: 20),
+                  label: Text(
+                    _sendingCode ? 'Sending...' : 'Send Verification Code',
+                  ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.primary,
-                    side:
-                        const BorderSide(color: AppColors.primary),
+                    side: const BorderSide(color: AppColors.primary),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -909,8 +1197,7 @@ class _ApplyScreenState extends State<ApplyScreen> {
                 ? AppTheme.primary.withValues(alpha: 0.08)
                 : Colors.white,
             border: Border.all(
-              color:
-                  selected ? AppTheme.primary : AppColors.border,
+              color: selected ? AppTheme.primary : AppColors.border,
               width: selected ? 2 : 1,
             ),
           ),
@@ -919,9 +1206,7 @@ class _ApplyScreenState extends State<ApplyScreen> {
               label,
               style: TextStyle(
                 fontWeight: FontWeight.w700,
-                color: selected
-                    ? AppTheme.primary
-                    : AppColors.textPrimary,
+                color: selected ? AppTheme.primary : AppColors.textPrimary,
               ),
             ),
           ),
@@ -941,8 +1226,7 @@ class _ApplyScreenState extends State<ApplyScreen> {
           decoration: InputDecoration(
             labelText: 'Date of Birth *',
             prefixIcon: const Icon(Icons.cake_outlined, size: 20),
-            errorText:
-                hasError ? 'You must be at least 18 years old.' : null,
+            errorText: hasError ? 'You must be at least 18 years old.' : null,
           ),
           child: Text(
             _dob == null ? 'Select date' : '$_dobLabel  (Age: $_age)',
@@ -977,22 +1261,32 @@ class _ApplyScreenState extends State<ApplyScreen> {
           },
           child: const Row(
             children: [
-              Icon(Icons.local_shipping_outlined,
-                  size: 36, color: AppTheme.primary),
+              Icon(
+                Icons.local_shipping_outlined,
+                size: 36,
+                color: AppTheme.primary,
+              ),
               SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Full-time Rider',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary)),
+                    Text(
+                      'Full-time Rider',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
                     SizedBox(height: 4),
-                    Text('Work regularly as a delivery rider',
-                        style: TextStyle(
-                            fontSize: 13, color: AppColors.textSecondary)),
+                    Text(
+                      'Work regularly as a delivery rider',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1008,22 +1302,28 @@ class _ApplyScreenState extends State<ApplyScreen> {
           },
           child: const Row(
             children: [
-              Icon(Icons.schedule_outlined,
-                  size: 36, color: AppTheme.primary),
+              Icon(Icons.schedule_outlined, size: 36, color: AppTheme.primary),
               SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Part-time Rider',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary)),
+                    Text(
+                      'Part-time Rider',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
                     SizedBox(height: 4),
-                    Text('Deliver during your available time',
-                        style: TextStyle(
-                            fontSize: 13, color: AppColors.textSecondary)),
+                    Text(
+                      'Deliver during your available time',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1042,8 +1342,10 @@ class _ApplyScreenState extends State<ApplyScreen> {
             _isFullTime
                 ? 'Full-time riders receive regular daily schedules and priority assignments.'
                 : 'Part-time riders deliver during their available time with flexible scheduling.',
-            style:
-                const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
           ),
         ),
       ],
@@ -1062,52 +1364,68 @@ class _ApplyScreenState extends State<ApplyScreen> {
           subtitle: 'Tell us about the vehicle you will use',
         ),
         const SizedBox(height: 20),
-        const Text('Vehicle Type *',
-            style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary)),
+        const Text(
+          'Vehicle Type *',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
         const SizedBox(height: 8),
         if (_loadingVehicles)
           const LinearProgressIndicator()
         else
-          ..._vehicles.map((v) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: SelectableCard(
-                  selected: _vehicleType == v.name,
-                  onTap: () => setState(() => _vehicleType = v.name),
-                  child: Row(
-                    children: [
-                      Icon(vehicleIconFor(v.name),
-                          size: 28, color: AppTheme.primary),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(v.label,
-                                style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.textPrimary)),
-                            Text(
-                                '${v.capacityKg.toStringAsFixed(0)} kg capacity',
-                                style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary)),
-                          ],
-                        ),
+          ..._vehicles.map(
+            (v) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: SelectableCard(
+                selected: _vehicleType == v.name,
+                onTap: () => setState(() => _vehicleType = v.name),
+                child: Row(
+                  children: [
+                    Icon(
+                      vehicleIconFor(v.name),
+                      size: 28,
+                      color: AppTheme.primary,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            v.label,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            '${v.capacityKg.toStringAsFixed(0)} kg capacity',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              )),
+              ),
+            ),
+          ),
         const SizedBox(height: 12),
-        const Text('Vehicle Ownership *',
-            style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary)),
+        const Text(
+          'Vehicle Ownership *',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
@@ -1117,11 +1435,73 @@ class _ApplyScreenState extends State<ApplyScreen> {
               .toList(),
         ),
         const SizedBox(height: 16),
-        _field(_plate, 'License Plate *', Icons.confirmation_number_outlined),
-        _field(_licenseNo, 'License Number *', Icons.badge_outlined),
-        _field(_vehicleReg, 'Vehicle Registration *',
-            Icons.directions_car_outlined),
+        _field(
+          _plate,
+          'License Plate *',
+          Icons.confirmation_number_outlined,
+          maxLength: 20,
+          errorText: _plateError,
+          hint: 'ABC 1234',
+          capitalization: TextCapitalization.characters,
+          formatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9 -]')),
+            UpperCaseTextFormatter(),
+          ],
+        ),
+        _field(
+          _licenseNo,
+          'License Number *',
+          Icons.badge_outlined,
+          maxLength: 20,
+          errorText: _licenseError,
+          hint: 'N01-23-456789',
+          capitalization: TextCapitalization.characters,
+          formatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9 -]')),
+            UpperCaseTextFormatter(),
+          ],
+        ),
+        _licenseExpiryField(),
+        _field(
+          _vehicleReg,
+          'Vehicle Registration *',
+          Icons.directions_car_outlined,
+          maxLength: 100,
+          errorText: _vehicleRegistrationError,
+          hint: 'OR/CR number',
+          capitalization: TextCapitalization.characters,
+        ),
       ],
+    );
+  }
+
+  Widget _licenseExpiryField() {
+    final hasError =
+        _licenseExpiry != null && _licenseExpiry!.isBefore(DateTime.now());
+    final label = _licenseExpiry == null
+        ? 'Select date'
+        : '${_licenseExpiry!.year}-${_licenseExpiry!.month.toString().padLeft(2, '0')}-${_licenseExpiry!.day.toString().padLeft(2, '0')}';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: InkWell(
+        onTap: _pickLicenseExpiry,
+        borderRadius: BorderRadius.circular(12),
+        child: InputDecorator(
+          decoration: InputDecoration(
+            labelText: 'License Expiry Date *',
+            prefixIcon: const Icon(Icons.event_outlined, size: 20),
+            errorText: hasError ? 'Expiry date must be in the future.' : null,
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: _licenseExpiry == null
+                  ? AppColors.textSecondary
+                  : AppColors.textPrimary,
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -1175,13 +1555,15 @@ class _ApplyScreenState extends State<ApplyScreen> {
           decoration: BoxDecoration(
             color: AppTheme.primary.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-                color: AppTheme.primary.withValues(alpha: 0.25)),
+            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
           ),
           child: Row(
             children: [
-              const Icon(Icons.person_outline,
-                  size: 18, color: AppTheme.primary),
+              const Icon(
+                Icons.person_outline,
+                size: 18,
+                color: AppTheme.primary,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -1217,13 +1599,19 @@ class _ApplyScreenState extends State<ApplyScreen> {
           ),
           child: const Row(
             children: [
-              Icon(Icons.info_outline, size: 16, color: AppColors.textSecondary),
+              Icon(
+                Icons.info_outline,
+                size: 16,
+                color: AppColors.textSecondary,
+              ),
               SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Tip: having your resume/biodata and GCash account details ready speeds up the review.',
-                  style:
-                      TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ),
             ],
@@ -1236,8 +1624,9 @@ class _ApplyScreenState extends State<ApplyScreen> {
   // ── Step 5: Documents ───────────────────────────────────────────────
 
   Widget _documentsStep({required Key key}) {
-    final missing =
-        _requiredDocs.where((d) => !_docs.containsKey(d.key)).length;
+    final missing = _requiredDocs
+        .where((d) => !_docs.containsKey(d.key))
+        .length;
     return Column(
       key: key,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1248,16 +1637,11 @@ class _ApplyScreenState extends State<ApplyScreen> {
         ),
         const SizedBox(height: 12),
         Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: missing == 0
-                ? AppColors.accent
-                : AppColors.accent,
+            color: missing == 0 ? AppColors.accent : AppColors.accent,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: AppColors.primary.withValues(alpha: 0.3),
-            ),
+            border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
           ),
           child: Row(
             children: [
@@ -1266,9 +1650,7 @@ class _ApplyScreenState extends State<ApplyScreen> {
                     ? Icons.check_circle_outline
                     : Icons.pending_outlined,
                 size: 18,
-                color: missing == 0
-                    ? AppColors.success
-                    : AppColors.primary,
+                color: missing == 0 ? AppColors.success : AppColors.primary,
               ),
               const SizedBox(width: 8),
               Text(
@@ -1278,9 +1660,7 @@ class _ApplyScreenState extends State<ApplyScreen> {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: missing == 0
-                      ? AppColors.success
-                      : AppColors.primary,
+                  color: missing == 0 ? AppColors.success : AppColors.primary,
                 ),
               ),
             ],
@@ -1330,8 +1710,10 @@ class _ApplyScreenState extends State<ApplyScreen> {
             MapEntry('Name', _fullDisplayName()),
             MapEntry('Email', _email.text.trim()),
             MapEntry('Phone', _phone.text.trim()),
-            MapEntry('Sex',
-                _sex == 'male' ? 'Male' : (_sex == 'female' ? 'Female' : '-')),
+            MapEntry(
+              'Sex',
+              _sex == 'male' ? 'Male' : (_sex == 'female' ? 'Female' : '-'),
+            ),
             MapEntry('Date of Birth', '$_dobLabel  (Age: $_age)'),
             MapEntry('Address', _addressSel?.composed ?? '—'),
           ],
@@ -1352,7 +1734,12 @@ class _ApplyScreenState extends State<ApplyScreen> {
             MapEntry('License plate', _plate.text.trim()),
             MapEntry('License number', _licenseNo.text.trim()),
             MapEntry(
-                'Vehicle registration', _vehicleReg.text.trim()),
+              'License expiry',
+              _licenseExpiry == null
+                  ? '-'
+                  : '${_licenseExpiry!.year}-${_licenseExpiry!.month.toString().padLeft(2, '0')}-${_licenseExpiry!.day.toString().padLeft(2, '0')}',
+            ),
+            MapEntry('Vehicle registration', _vehicleReg.text.trim()),
           ],
         ),
         const SizedBox(height: 12),
@@ -1379,14 +1766,15 @@ class _ApplyScreenState extends State<ApplyScreen> {
                 Checkbox(
                   value: _confirm,
                   activeColor: AppTheme.primary,
-                  onChanged: (v) =>
-                      setState(() => _confirm = v ?? false),
+                  onChanged: (v) => setState(() => _confirm = v ?? false),
                 ),
                 const Expanded(
                   child: Text(
-                    'I confirm that the information I provided is accurate.',
+                    'I confirm that the information I provided is accurate and I agree to the Terms of Service and Privacy Policy.',
                     style: TextStyle(
-                        fontSize: 13, color: AppColors.textPrimary),
+                      fontSize: 13,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                 ),
               ],
@@ -1404,9 +1792,10 @@ class _ApplyScreenState extends State<ApplyScreen> {
                 child: CircularProgressIndicator(strokeWidth: 2.5),
               ),
               SizedBox(width: 10),
-              Text('Submitting application...',
-                  style: TextStyle(
-                      fontSize: 13, color: AppColors.textSecondary)),
+              Text(
+                'Submitting application...',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              ),
             ],
           ),
         ],
@@ -1422,6 +1811,14 @@ class _ApplyScreenState extends State<ApplyScreen> {
     IconData? icon, {
     TextInputType? keyboard,
     int maxLines = 1,
+    int? maxLength,
+    String? errorText,
+    String? hint,
+    TextCapitalization capitalization = TextCapitalization.none,
+    List<TextInputFormatter>? formatters,
+    Iterable<String>? autofillHints,
+    TextInputAction? action,
+    bool autocorrect = true,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -1429,9 +1826,22 @@ class _ApplyScreenState extends State<ApplyScreen> {
         controller: controller,
         keyboardType: keyboard,
         maxLines: maxLines,
+        textCapitalization: capitalization,
+        textInputAction: action,
+        autofillHints: autofillHints,
+        autocorrect: autocorrect,
+        inputFormatters: [
+          if (maxLength != null) LengthLimitingTextInputFormatter(maxLength),
+          ...?formatters,
+        ],
+        onChanged: (_) {
+          if (_showErrors && mounted) setState(() {});
+        },
         // Border, fill and focus outline come from the Invoiz input theme.
         decoration: InputDecoration(
           labelText: label,
+          hintText: hint,
+          errorText: errorText,
           prefixIcon: icon != null ? Icon(icon, size: 20) : null,
         ),
       ),
@@ -1466,22 +1876,27 @@ class _ApplySuccessScreen extends StatelessWidget {
                   color: AppColors.success.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.check,
-                    size: 48, color: AppColors.success),
+                child: const Icon(
+                  Icons.check,
+                  size: 48,
+                  color: AppColors.success,
+                ),
               ),
               const SizedBox(height: 20),
               const Text(
                 'Application Submitted!',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                    fontSize: 24, fontWeight: FontWeight.w700),
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 8),
               const Text(
                 'Your rider application has been successfully submitted.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                    fontSize: 14, color: AppColors.textSecondary, height: 1.5),
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                  height: 1.5,
+                ),
               ),
               const SizedBox(height: 20),
               Container(

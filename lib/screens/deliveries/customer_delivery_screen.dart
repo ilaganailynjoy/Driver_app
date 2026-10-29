@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/format_utils.dart';
 import '../../core/utils/geolocation.dart';
 import '../../providers/delivery_provider.dart';
+import '../../widgets/app_ui.dart';
 import '../../widgets/error_widget.dart';
 import '../../widgets/loading_widget.dart';
 import 'proof_of_delivery_screen.dart';
@@ -67,31 +68,46 @@ class _CustomerDeliveryScreenState extends State<CustomerDeliveryScreen> {
         children: [
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppGaps.lg),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    customer.name,
-                    style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.w800),
+                  Row(
+                    children: [
+                      AvatarView(label: customer.name, radius: 24),
+                      const SizedBox(width: AppGaps.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(customer.name, style: AppText.title.copyWith(fontSize: 19)),
+                            if (customer.phone != null &&
+                                customer.phone!.isNotEmpty)
+                              Text(customer.phone!, style: AppText.secondary),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  if (customer.phone != null &&
-                      customer.phone!.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      customer.phone!,
-                      style: const TextStyle(
-                          fontSize: 15, color: AppColors.textSecondary),
-                    ),
-                  ],
                   if (customer.address != null &&
                       customer.address!.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      customer.address!,
-                      style: const TextStyle(
-                          fontSize: 14, color: AppColors.textSecondary),
+                    const SizedBox(height: AppGaps.md),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.location_on_outlined,
+                          size: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: AppGaps.sm),
+                        Expanded(
+                          child: Text(
+                            customer.address!,
+                            style: AppText.secondary,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                   const SizedBox(height: 16),

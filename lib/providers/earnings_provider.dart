@@ -48,12 +48,19 @@ class EarningsProvider extends ChangeNotifier {
   Future<void> loadHistory({
     String? search,
     String? status,
+    String? from,
+    String? to,
   }) async {
     _historyLoading = true;
     notifyListeners();
 
     try {
-      _history = await _service.history(search: search, status: status);
+      _history = await _service.history(
+        search: search,
+        status: status,
+        from: from,
+        to: to,
+      );
     } on ApiException catch (e) {
       _error = e.message;
     } catch (_) {

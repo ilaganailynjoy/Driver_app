@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import '../core/network/api_client.dart';
 import '../core/network/api_exception.dart';
+import '../core/utils/name_validation.dart';
 
 /// Formats a center application id as CEN-YYYY-NNNN, e.g. CEN-2026-0001.
 class CenterApplicationReference {
@@ -100,7 +101,13 @@ class CenterApplicationService {
 
   Future<CenterApplicationSubmitResult> submit({
     required String businessName,
-    required String ownerName,
+    required String ownerFirstName,
+    String ownerMiddleName = '',
+    required String ownerLastName,
+    required String secNumber,
+    required String tin,
+    required String postalCode,
+    required String region,
     required String email,
     required String phone,
     required String address,
@@ -112,8 +119,15 @@ class CenterApplicationService {
     String? province,
   }) async {
     final fields = <String, String>{
-      'business_name': businessName,
-      'owner_name': ownerName,
+      'business_name': NameValidation.normalize(businessName),
+      'owner_first_name': NameValidation.normalize(ownerFirstName),
+      if (ownerMiddleName.trim().isNotEmpty)
+        'owner_middle_name': NameValidation.normalize(ownerMiddleName),
+      'owner_last_name': NameValidation.normalize(ownerLastName),
+      'sec_number': secNumber,
+      'tin': tin,
+      'postal_code': postalCode,
+      'region': region,
       'email': email,
       'phone': phone,
       'address': address,
@@ -129,11 +143,13 @@ class CenterApplicationService {
     };
     final files = <String, ({Uint8List bytes, String filename})>{};
     documents.forEach((k, v) => files['documents[$k]'] = v);
-    final data = await _api.postMultipartMany(
-      '/center/apply',
-      files: files,
-      fields: fields,
-    ) as Map<String, dynamic>;
+    final data =
+        await _api.postMultipartMany(
+              '/center/apply',
+              files: files,
+              fields: fields,
+            )
+            as Map<String, dynamic>;
     final app = (data['application'] as Map?) ?? {};
     return CenterApplicationSubmitResult(
       id: (app['id'] as num?)?.toInt() ?? 0,
@@ -144,8 +160,10 @@ class CenterApplicationService {
 
   Future<CenterApplicationStatus?> getStatus(String email) async {
     try {
-      final data = await _api
-          .get('/center/application-status', query: {'email': email});
+      final data = await _api.get(
+        '/center/application-status',
+        query: {'email': email},
+      );
       final app = data['application'] as Map?;
       if (app == null) return null;
       return CenterApplicationStatus.fromJson(Map<String, dynamic>.from(app));

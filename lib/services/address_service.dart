@@ -3,15 +3,19 @@ import '../core/network/api_client.dart';
 /// Philippine Standard Geographic Code (PSGC) option row: id + name.
 /// All three levels share the same shape.
 class PsgcOption {
-  const PsgcOption({required this.id, required this.name});
+  const PsgcOption({required this.id, required this.name, this.regionCode});
 
   final int id;
   final String name;
+  final String? regionCode;
 
   factory PsgcOption.fromJson(Map<String, dynamic> j) => PsgcOption(
-        id: (j['id'] as num?)?.toInt() ?? 0,
-        name: j['name'] as String? ?? '',
-      );
+    id: (j['id'] as num?)?.toInt() ?? 0,
+    name: j['name'] as String? ?? '',
+    regionCode: (j['region_code'] as String?)?.trim().isEmpty ?? true
+        ? null
+        : (j['region_code'] as String).trim(),
+  );
 }
 
 /// Structured address selection: province / municipality / barangay names.
@@ -56,16 +60,16 @@ class AddressService {
   }
 
   Future<List<PsgcOption>> municipalities(int provinceId) async {
-    final data = await _api.get(
-      '/address/provinces/$provinceId/municipalities',
-    ) as Map<String, dynamic>;
+    final data =
+        await _api.get('/address/provinces/$provinceId/municipalities')
+            as Map<String, dynamic>;
     return _options(data['municipalities']);
   }
 
   Future<List<PsgcOption>> barangays(int municipalityId) async {
-    final data = await _api.get(
-      '/address/municipalities/$municipalityId/barangays',
-    ) as Map<String, dynamic>;
+    final data =
+        await _api.get('/address/municipalities/$municipalityId/barangays')
+            as Map<String, dynamic>;
     return _options(data['barangays']);
   }
 

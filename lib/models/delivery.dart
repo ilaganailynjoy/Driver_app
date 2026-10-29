@@ -18,6 +18,7 @@ class Delivery {
     required this.total,
     this.paymentMethod,
     this.amountToCollect,
+    this.otpRequired = false,
     this.pickupPinRequired = false,
     this.notes,
     this.weight,
@@ -27,6 +28,9 @@ class Delivery {
     this.deliveredAt,
     this.failedAt,
     this.failureReason,
+    this.reattemptRequestedAt,
+    this.returnedAt,
+    this.returnReason,
     this.proofType,
     this.statusLogs = const [],
     this.parcelStatus,
@@ -51,6 +55,7 @@ class Delivery {
   final double total;
   final String? paymentMethod;
   final double? amountToCollect;
+  final bool otpRequired;
   final bool pickupPinRequired;
   final String? notes;
   final String? weight;
@@ -60,7 +65,16 @@ class Delivery {
   final DateTime? deliveredAt;
   final DateTime? failedAt;
   final String? failureReason;
+  final DateTime? reattemptRequestedAt;
+  final DateTime? returnedAt;
+  final String? returnReason;
   final String? proofType;
+
+  /// A re-attempt was requested and is awaiting Logistics review.
+  bool get hasReattemptRequest => reattemptRequestedAt != null;
+
+  /// The parcel was returned to the sorting center.
+  bool get hasCenterReturn => returnedAt != null;
   final List<StatusLog> statusLogs;
   final String? parcelStatus;
   final DateTime? sortingCenterHandoffAt;
@@ -77,14 +91,14 @@ class Delivery {
   bool get isCashOnDelivery => paymentMethod == 'cash_on_delivery';
 
   bool get isActive => const [
-        'assigned',
-        'accepted',
-        'going_to_pickup',
-        'arrived_at_shop',
-        'picked_up',
-        'out_for_delivery',
-        'arrived_at_customer',
-      ].contains(status);
+    'assigned',
+    'accepted',
+    'going_to_pickup',
+    'arrived_at_shop',
+    'picked_up',
+    'out_for_delivery',
+    'arrived_at_customer',
+  ].contains(status);
 
   /// Statuses that belong in the rider-facing Status History.
   ///
@@ -124,20 +138,21 @@ class Delivery {
 
     List<StatusLog> logs = [];
     if (json['status_logs'] is List) {
-      logs = (json['status_logs'] as List)
-          .whereType<Map<String, dynamic>>()
-          .map(StatusLog.fromJson)
-          .where((log) => riderHistoryStatuses.contains(log.status))
-          .toList()
-        // Chronological (oldest first) by actual record timestamp.
-        ..sort((a, b) {
-          final ac = a.createdAt;
-          final bc = b.createdAt;
-          if (ac == null && bc == null) return 0;
-          if (ac == null) return 1;
-          if (bc == null) return -1;
-          return ac.compareTo(bc);
-        });
+      logs =
+          (json['status_logs'] as List)
+              .whereType<Map<String, dynamic>>()
+              .map(StatusLog.fromJson)
+              .where((log) => riderHistoryStatuses.contains(log.status))
+              .toList()
+            // Chronological (oldest first) by actual record timestamp.
+            ..sort((a, b) {
+              final ac = a.createdAt;
+              final bc = b.createdAt;
+              if (ac == null && bc == null) return 0;
+              if (ac == null) return 1;
+              if (bc == null) return -1;
+              return ac.compareTo(bc);
+            });
     }
 
     String? proofType;
@@ -151,16 +166,17 @@ class Delivery {
       orderId: (json['order_id'] as num?)?.toInt(),
       status: json['status'] as String? ?? 'waiting_for_rider',
       statusLabel: json['status_label'] as String? ?? '',
-      shop: Shop.fromJson(
-          (json['shop'] as Map<String, dynamic>?) ?? const {}),
+      shop: Shop.fromJson((json['shop'] as Map<String, dynamic>?) ?? const {}),
       customer: Customer.fromJson(
-          (json['customer'] as Map<String, dynamic>?) ?? const {}),
+        (json['customer'] as Map<String, dynamic>?) ?? const {},
+      ),
       items: items,
       subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0,
       deliveryFee: (json['delivery_fee'] as num?)?.toDouble(),
       total: (json['total'] as num?)?.toDouble() ?? 0,
       paymentMethod: json['payment_method'] as String?,
       amountToCollect: (json['amount_to_collect'] as num?)?.toDouble(),
+      otpRequired: json['otp_required'] as bool? ?? (json['order_id'] != null),
       pickupPinRequired: json['pickup_pin_required'] as bool? ?? false,
       notes: json['notes'] as String?,
       weight: json['weight']?.toString(),
@@ -170,6 +186,9 @@ class Delivery {
       deliveredAt: _parseDate(json['delivered_at']),
       failedAt: _parseDate(json['failed_at']),
       failureReason: json['failure_reason'] as String?,
+      reattemptRequestedAt: _parseDate(json['reattempt_requested_at']),
+      returnedAt: _parseDate(json['returned_at']),
+      returnReason: json['return_reason'] as String?,
       proofType: proofType,
       statusLogs: logs,
       parcelStatus: json['parcel_status'] as String?,
@@ -181,13 +200,13 @@ class Delivery {
           (json['sorting_center_pickup_rider_id'] as num?)?.toInt(),
       handlingCenterName: (json['logistics_center'] is Map<String, dynamic>)
           ? (json['logistics_center'] as Map<String, dynamic>)['name']
-              as String?
+                as String?
           : null,
       destinationCenterName:
           (json['destination_center'] is Map<String, dynamic>)
-              ? (json['destination_center'] as Map<String, dynamic>)['name']
-                  as String?
-              : null,
+          ? (json['destination_center'] as Map<String, dynamic>)['name']
+                as String?
+          : null,
     );
   }
 
@@ -211,6 +230,7 @@ class Delivery {
       total: total,
       paymentMethod: paymentMethod,
       amountToCollect: amountToCollect,
+      otpRequired: otpRequired,
       pickupPinRequired: pickupPinRequired,
       notes: notes,
       weight: weight,
@@ -220,6 +240,9 @@ class Delivery {
       deliveredAt: deliveredAt,
       failedAt: failedAt,
       failureReason: failureReason,
+      reattemptRequestedAt: reattemptRequestedAt,
+      returnedAt: returnedAt,
+      returnReason: returnReason,
       proofType: proofType,
       statusLogs: statusLogs,
       parcelStatus: parcelStatus,
@@ -235,11 +258,7 @@ class Delivery {
 
 /// A single entry in the delivery's status history.
 class StatusLog {
-  const StatusLog({
-    required this.status,
-    this.notes,
-    this.createdAt,
-  });
+  const StatusLog({required this.status, this.notes, this.createdAt});
 
   final String status;
   final String? notes;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';
+import 'app_ui.dart';
 
 /// Friendly error state with a retry button.
 class ErrorView extends StatelessWidget {
@@ -21,20 +22,27 @@ class ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.cloud_off_outlined,
-                size: 56, color: AppColors.textSecondary),
-            const SizedBox(height: 16),
+            Container(
+              width: 76,
+              height: 76,
+              decoration: BoxDecoration(
+                color: AppTheme.danger.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+              ),
+              child: const Icon(
+                Icons.cloud_off_outlined,
+                size: 34,
+                color: AppTheme.danger,
+              ),
+            ),
+            const SizedBox(height: AppGaps.lg),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 15,
-                height: 1.4,
-              ),
+              style: AppText.body.copyWith(fontSize: 15),
             ),
             if (onRetry != null) ...[
-              const SizedBox(height: 20),
+              const SizedBox(height: AppGaps.xl),
               OutlinedButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh),
@@ -68,50 +76,11 @@ class EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Icon(icon, size: 34, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            if (message != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                message!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                  height: 1.4,
-                ),
-              ),
-            ],
-            if (action != null) ...[
-              const SizedBox(height: 20),
-              action!,
-            ],
-          ],
-        ),
-      ),
+    return EmptyView(
+      icon: icon,
+      title: title,
+      message: message,
+      action: action,
     );
   }
 }

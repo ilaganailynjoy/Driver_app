@@ -1,21 +1,30 @@
 import 'package:flutter/foundation.dart';
 
 import '../core/network/api_exception.dart';
+import '../core/utils/geolocation.dart';
 import '../models/delivery.dart';
 import '../models/rider.dart';
 import '../services/rider_service.dart';
 
 /// Rider profile, availability and dashboard state.
 class RiderProvider extends ChangeNotifier {
-  RiderProvider(this._service);
+  RiderProvider(
+    this._service, {
+    Future<LocationReadiness> Function()? locationCheck,
+    Future<LocationReadiness> Function()? locationMonitor,
+  }) : _locationCheck = locationCheck ?? Geolocation.ensureReady,
+       _locationMonitor = locationMonitor ?? Geolocation.checkReadiness;
 
   final RiderService _service;
+  final Future<LocationReadiness> Function() _locationCheck;
+  final Future<LocationReadiness> Function() _locationMonitor;
 
   Rider? _rider;
   DashboardSummary? _dashboard;
   bool _loading = false;
   String? _error;
   bool _statusBusy = false;
+  String? _locationWarning;
 
   Rider? get rider => _rider;
   DashboardSummary? get dashboard => _dashboard;
@@ -23,6 +32,11 @@ class RiderProvider extends ChangeNotifier {
   String? get error => _error;
   bool get statusBusy => _statusBusy;
   bool get isOnline => _rider?.isOnline ?? false;
+
+  /// Warning shown while online but location is unavailable (M13). New job
+  /// offers stop while the rider cannot be located, so this must not be
+  /// silent.
+  String? get locationWarning => _locationWarning;
 
   Future<void> loadProfile() async {
     _loading = true;
@@ -67,14 +81,30 @@ class RiderProvider extends ChangeNotifier {
   }
 
   /// Toggle the online/offline availability switch (synced with Laravel).
+  ///
+  /// Going online requires a usable location permission because the app sends
+  /// GPS pings while the rider is available. Going offline never asks.
   Future<bool> toggleOnline() async {
+    final goingOnline = _rider?.isOnline != true;
+    _error = null;
+
+    if (goingOnline) {
+      final readiness = await _locationCheck();
+      if (readiness != LocationReadiness.ready) {
+        _error = Geolocation.readinessMessage(readiness);
+        notifyListeners();
+        return false;
+      }
+    }
+
     _statusBusy = true;
     notifyListeners();
 
     try {
-      final target = _rider?.isOnline == true ? 'offline' : 'online';
+      final target = goingOnline ? 'online' : 'offline';
       final updated = await _service.updateStatus(target);
       _rider = updated;
+      if (target == 'offline') _locationWarning = null;
       if (_dashboard != null) {
         _dashboard = DashboardSummary(
           stats: _dashboard!.stats,
@@ -100,6 +130,36 @@ class RiderProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  /// Warn when location is turned off mid-shift.
+  ///
+  /// While the rider is online the app sends GPS pings; if location is
+  /// unavailable the backend can no longer place the rider, so no new offers
+  /// arrive. Runs without prompting for permission.
+  Future<void> refreshLocationWarning() async {
+    if (_rider?.isOnline != true) {
+      if (_locationWarning != null) {
+        _locationWarning = null;
+        notifyListeners();
+      }
+      return;
+    }
+
+    final readiness = await _locationMonitor();
+    final next = readiness == LocationReadiness.ready
+        ? null
+        : Geolocation.readinessMessage(readiness);
+    if (next != _locationWarning) {
+      _locationWarning = next;
+      notifyListeners();
+    }
+  }
+
+  void dismissLocationWarning() {
+    if (_locationWarning == null) return;
+    _locationWarning = null;
+    notifyListeners();
   }
 
   Future<bool> updateProfile({

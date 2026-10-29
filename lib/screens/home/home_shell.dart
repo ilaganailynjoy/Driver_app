@@ -11,6 +11,8 @@ import '../../providers/earnings_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/rider_provider.dart';
 import '../../services/location_service.dart';
+import '../../services/tutorial_completion_store.dart';
+import '../onboarding/rider_tutorial_screen.dart';
 import '../auth/login_screen.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../deliveries/deliveries_screen.dart';
@@ -28,17 +30,24 @@ import '../../widgets/liquid_nav_bar.dart';
 /// scanner keeps its single-shot pushReplacement flow. Messages lives in
 /// the top bar, left of the notifications icon.
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key});
+  const HomeShell({
+    super.key,
+    this.tutorialStore = const TutorialCompletionStore(),
+  });
+
+  final TutorialCompletionStore tutorialStore;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   /// Active dock slot: 0 = Home, 1 = Deliveries, 3 = Settings, 4 = Profile.
   /// Slot 2 (Scan) is an action and never becomes the selection.
   int _tab = 0;
   Timer? _locationTimer;
+  bool _appResumed = true;
+  bool _tutorialCheckStarted = false;
 
   static const _screens = [
     DashboardScreen(),
@@ -52,9 +61,42 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _preload();
     _startLocationHeartbeat();
     _redirectOnLogout();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkFirstTutorial());
+  }
+
+  Future<void> _checkFirstTutorial() async {
+    if (!mounted || _tutorialCheckStarted) return;
+    _tutorialCheckStarted = true;
+    final rider = context.read<AuthProvider>().rider;
+    if (rider == null || rider.id <= 0) return;
+    final completed = await widget.tutorialStore.isCompleted(rider.id);
+    if (!mounted ||
+        completed ||
+        !context.read<AuthProvider>().isAuthenticated) {
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            RiderTutorialScreen(riderId: rider.id, store: widget.tutorialStore),
+      ),
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appResumed = state == AppLifecycleState.resumed;
+    if (_appResumed) {
+      _startLocationHeartbeat();
+    } else {
+      // The OS may keep the process alive; stop GPS pings while backgrounded.
+      _locationTimer?.cancel();
+      _locationTimer = null;
+    }
   }
 
   void _redirectOnLogout() {
@@ -64,9 +106,7 @@ class _HomeShellState extends State<HomeShell> {
   void _onAuthChanged() {
     final auth = context.read<AuthProvider>();
     if (auth.status == AuthStatus.unauthenticated && mounted) {
-      Navigator.of(
-        context,
-      ).pushAndRemoveUntil(
+      Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const LoginScreen()),
         (route) => false,
       );
@@ -75,6 +115,7 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     context.read<AuthProvider>().removeListener(_onAuthChanged);
     _locationTimer?.cancel();
     super.dispose();
@@ -92,30 +133,43 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   void _startLocationHeartbeat() {
+    if (!_appResumed) return;
     _locationTimer?.cancel();
-    _locationTimer = Timer.periodic(const Duration(seconds: AppConstants.locationUpdateInterval), (_) async {
-      if (!mounted) return;
-      final rider = context.read<RiderProvider>();
-      if (!rider.isOnline) return;
+    _locationTimer = Timer.periodic(
+      const Duration(seconds: AppConstants.locationUpdateInterval),
+      (_) => _heartbeat(),
+    );
+    _heartbeat();
+  }
+
+  Future<void> _heartbeat() async {
+    if (!mounted || !_appResumed) return;
+    final rider = context.read<RiderProvider>();
+    if (!rider.isOnline) return;
+
+    // Detect location switched off mid-shift so the rider is warned that new
+    // offers have stopped (M13). Never prompts for permission.
+    await rider.refreshLocationWarning();
+    if (!mounted || !_appResumed) return;
+
+    try {
+      final auth = context.read<AuthProvider>();
+      final svc = LocationService(auth.api);
+      int? deliveryId;
       try {
-        final auth = context.read<AuthProvider>();
-        final svc = LocationService(auth.api);
-        int? deliveryId;
-        try {
-          deliveryId = context.read<DeliveryProvider>().selected?.id;
-        } catch (_) {}
-        await svc.report(deliveryId: deliveryId);
+        deliveryId = context.read<DeliveryProvider>().selected?.id;
       } catch (_) {}
-    });
+      await svc.report(deliveryId: deliveryId);
+    } catch (_) {}
   }
 
   void _onDockTap(int slot) {
     if (slot == 2) {
       // Scan is an action: open the scanner without changing tabs so its
       // single-shot flow (pushReplacement to delivery detail) is preserved.
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const ScanParcelScreen()),
-      );
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const ScanParcelScreen()));
       return;
     }
     if (slot == 1) context.read<DeliveryProvider>().load();
@@ -139,15 +193,31 @@ class _HomeShellState extends State<HomeShell> {
           Consumer<NotificationProvider>(
             builder: (_, p, _) => Stack(
               children: [
-                IconButton(icon: const Icon(Icons.notifications_outlined), onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotificationsScreen()))),
+                IconButton(
+                  icon: const Icon(Icons.notifications_outlined),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const NotificationsScreen(),
+                    ),
+                  ),
+                ),
                 if (p.unread > 0)
                   Positioned(
                     right: 6,
                     top: 6,
                     child: Container(
                       padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(color: AppColors.warning, shape: BoxShape.circle),
-                      child: Text('${p.unread}', style: const TextStyle(color: Colors.white, fontSize: 10)),
+                      decoration: const BoxDecoration(
+                        color: AppColors.warning,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        '${p.unread}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                        ),
+                      ),
                     ),
                   ),
               ],
@@ -162,10 +232,7 @@ class _HomeShellState extends State<HomeShell> {
       ),
       bottomNavigationBar: SafeArea(
         top: false,
-        child: LiquidNavBar(
-          selectedIndex: _tab,
-          onTap: _onDockTap,
-        ),
+        child: LiquidNavBar(selectedIndex: _tab, onTap: _onDockTap),
       ),
     );
   }

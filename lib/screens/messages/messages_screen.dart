@@ -7,7 +7,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/motion.dart';
 import '../../models/conversation.dart';
+import '../../widgets/app_ui.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/message_service.dart';
 
@@ -467,18 +469,31 @@ class _MessagesScreenState extends State<MessagesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        title: Row(
           children: [
-            Text(_header?.displayName ?? 'Messages',
-                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-            if (_header != null)
-              Text(
-                _header!.tracking != null
-                    ? '${_header!.recipientLabel ?? 'Support'} · ${_header!.tracking}'
-                    : (_header!.recipientLabel ?? 'Support'),
-                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            AvatarView(
+              label: _header?.displayName ?? 'Messages',
+              radius: 17,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_header?.displayName ?? 'Messages',
+                      style:
+                          const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                  if (_header != null)
+                    Text(
+                      _header!.tracking != null
+                          ? '${_header!.recipientLabel ?? 'Support'} · ${_header!.tracking}'
+                          : (_header!.recipientLabel ?? 'Support'),
+                      style: const TextStyle(
+                          fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                ],
               ),
+            ),
           ],
         ),
         centerTitle: false,
@@ -511,7 +526,22 @@ class _MessagesScreenState extends State<MessagesScreen> {
                         final m = _messages[i];
                         final showDay = i == 0 || _messages[i - 1].dayLabel != m.dayLabel;
                         return Column(children: [
-                          if (showDay) Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(m.dayLabel, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
+                          if (showDay)
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 12),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceSoft,
+                                  borderRadius: BorderRadius.circular(
+                                      AppRadius.pill),
+                                ),
+                                child: Text(m.dayLabel,
+                                    style: AppText.caption),
+                              ),
+                            ),
                           Align(
                             alignment: m.mine ? Alignment.centerRight : Alignment.centerLeft,
                             child: Container(
@@ -520,7 +550,15 @@ class _MessagesScreenState extends State<MessagesScreen> {
                               constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
                               decoration: BoxDecoration(
                                 color: m.mine ? AppTheme.primary : Colors.white,
-                                borderRadius: BorderRadius.circular(16),
+                                // Tight corner on the sender's side marks
+                                // the direction of each message.
+                                borderRadius: BorderRadius.only(
+                                  topLeft: const Radius.circular(18),
+                                  topRight: const Radius.circular(18),
+                                  bottomLeft: Radius.circular(m.mine ? 18 : 6),
+                                  bottomRight:
+                                      Radius.circular(m.mine ? 6 : 18),
+                                ),
                                 border: Border.all(color: m.mine ? AppTheme.primary : AppColors.border),
                               ),
                               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -571,9 +609,13 @@ class _MessagesScreenState extends State<MessagesScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (_editing != null)
-                Container(
-                  width: double.infinity,
+              AnimatedSwitcher(
+                duration: AppMotion.micro,
+                switchInCurve: AppMotion.easeOut,
+                child: _editing != null
+                    ? Container(
+                        key: ValueKey(_editing!.id),
+                        width: double.infinity,
                   margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
@@ -601,10 +643,16 @@ class _MessagesScreenState extends State<MessagesScreen> {
                       ),
                     ],
                   ),
-                ),
-              if (_pendingName != null)
-                Container(
-                  width: double.infinity,
+                )
+              : const SizedBox.shrink(),
+            ),
+              AnimatedSwitcher(
+                duration: AppMotion.micro,
+                switchInCurve: AppMotion.easeOut,
+                child: _pendingName != null
+                    ? Container(
+                        key: ValueKey(_pendingName),
+                        width: double.infinity,
                   margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -671,7 +719,9 @@ class _MessagesScreenState extends State<MessagesScreen> {
                       ),
                     ],
                   ),
-                ),
+                )
+              : const SizedBox.shrink(),
+            ),
               Row(children: [
             IconButton(
                 onPressed: _sending ? null : _showAttachMenu,

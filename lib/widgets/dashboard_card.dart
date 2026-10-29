@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';
+import 'app_ui.dart';
 
 /// A tappable stat card used on the dashboard.
+///
+/// Icon tile, tabular KPI value, then the label — the same information as
+/// before, set in the shared type scale so the four stats read as one row.
 class DashboardCard extends StatelessWidget {
   const DashboardCard({
     super.key,
@@ -23,44 +27,29 @@ class DashboardCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         child: Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(AppGaps.md),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             border: Border.all(color: AppColors.border),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              const SizedBox(height: 10),
+              IconTile(icon: icon, size: 38, iconSize: 20, color: color),
+              const SizedBox(height: AppGaps.sm),
               Text(
                 value,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
+                style: AppText.kpi(24).copyWith(color: color),
               ),
               const SizedBox(height: 2),
               Text(
                 label,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                ),
+                style: AppText.caption,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),

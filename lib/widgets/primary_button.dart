@@ -18,7 +18,7 @@ class PrimaryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 52,
+      height: 56,
       child: ElevatedButton(
         onPressed: loading ? null : onPressed,
         style: ElevatedButton.styleFrom(
@@ -26,12 +26,13 @@ class PrimaryButton extends StatelessWidget {
           foregroundColor: Colors.white,
           disabledBackgroundColor: AppTheme.primary.withValues(alpha: 0.6),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
           ),
-          elevation: 0,
+          elevation: 6,
+          shadowColor: AppTheme.primary.withValues(alpha: 0.35),
           textStyle: const TextStyle(
             fontSize: 16,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
             letterSpacing: 0.3,
           ),
         ),

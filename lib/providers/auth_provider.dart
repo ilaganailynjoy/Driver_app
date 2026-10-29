@@ -13,12 +13,10 @@ enum AuthStatus { unknown, authenticated, unauthenticated }
 
 /// Global authentication state.
 class AuthProvider extends ChangeNotifier {
-  AuthProvider({
-    required ApiClient api,
-    required this._storage,
-  })  : _api = api,
-        _authService = AuthService(api),
-        _riderService = RiderService(api);
+  AuthProvider({required ApiClient api, required this._storage})
+    : _api = api,
+      _authService = AuthService(api),
+      _riderService = RiderService(api);
 
   final ApiClient _api;
   final TokenStorage _storage;
@@ -89,10 +87,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final result = await _authService.login(
-        email: email,
-        password: password,
-      );
+      final result = await _authService.login(email: email, password: password);
 
       _api.setToken(result.token);
       await _storage.saveToken(result.token);
@@ -107,8 +102,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } catch (_) {
-      _error =
-          'Unable to log in. Please check your connection and try again.';
+      _error = 'Unable to log in. Please check your connection and try again.';
       _status = AuthStatus.unauthenticated;
       notifyListeners();
       return false;
@@ -116,6 +110,16 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    // Stop new assignments before revoking the token so dispatch does not
+    // keep offering work to a signed-out rider.
+    if (_rider?.isOnline == true) {
+      try {
+        await _riderService.updateStatus('offline');
+      } catch (_) {
+        // Best-effort only: never block logout on a failed status update.
+      }
+    }
+
     try {
       await _authService.logout();
     } catch (_) {
@@ -136,9 +140,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> _persistUser(Rider rider) async {
-    final payload = {
-      'rider': rider.toJson(),
-    };
+    final payload = {'rider': rider.toJson()};
     await _storage.saveUser(jsonEncode(payload));
   }
 

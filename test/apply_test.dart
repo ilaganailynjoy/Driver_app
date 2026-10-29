@@ -16,10 +16,10 @@ import '../lib/screens/apply/apply_screen.dart';
 MockClient _applyBackend() {
   return MockClient((http.BaseRequest request) async {
     http.Response json(Object data, int status) => http.Response(
-          jsonEncode(data),
-          status,
-          headers: {'content-type': 'application/json'},
-        );
+      jsonEncode(data),
+      status,
+      headers: {'content-type': 'application/json'},
+    );
     final path = request.url.path;
     if (path.endsWith('/rider/email/request-code') ||
         path.endsWith('/rider/email/resend')) {
@@ -28,28 +28,28 @@ MockClient _applyBackend() {
     if (path.endsWith('/rider/email/verify')) {
       return json({
         'message': 'Email verified successfully.',
-        'email': 'juan.test@example.com'
+        'email': 'juan.test@example.com',
       }, 200);
     }
     if (path.endsWith('/provinces')) {
       return json({
         'provinces': [
-          {'id': 120000000, 'name': 'SOCCSKSARGEN'}
-        ]
+          {'id': 120000000, 'name': 'SOCCSKSARGEN'},
+        ],
       }, 200);
     }
     if (!path.endsWith('/provinces') && path.endsWith('/municipalities')) {
       return json({
         'municipalities': [
-          {'id': 1200100000, 'name': 'General Santos City'}
-        ]
+          {'id': 1200100000, 'name': 'General Santos City'},
+        ],
       }, 200);
     }
     if (path.endsWith('/barangays')) {
       return json({
         'barangays': [
-          {'id': 1200100001, 'name': 'Barangay Poblacion'}
-        ]
+          {'id': 1200100001, 'name': 'Barangay Poblacion'},
+        ],
       }, 200);
     }
     return json({'message': 'not found'}, 404);
@@ -62,8 +62,10 @@ Future<void> _selectAddress(WidgetTester tester) async {
   Future<void> pick(int index) async {
     await tester.ensureVisible(find.byType(DropdownButton<String>).first);
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButton<String>).at(index),
-        warnIfMissed: false);
+    await tester.tap(
+      find.byType(DropdownButton<String>).at(index),
+      warnIfMissed: false,
+    );
     await tester.pumpAndSettle();
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
@@ -87,14 +89,17 @@ Future<void> _verifyEmail(WidgetTester tester) async {
     await tester.pump(const Duration(milliseconds: 100));
   }
   await tester.enterText(
-      find.widgetWithText(TextField, 'Verification Code'), '123456');
+    find.widgetWithText(TextField, 'Verification Code'),
+    '123456',
+  );
   await tester.pump();
   await tester.ensureVisible(find.text('Verify Email'));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Verify Email'));
   await tester.pumpAndSettle();
-  final sm =
-      tester.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger));
+  final sm = tester.state<ScaffoldMessengerState>(
+    find.byType(ScaffoldMessenger),
+  );
   sm.clearSnackBars();
   await tester.pumpAndSettle();
 }
@@ -108,16 +113,20 @@ void main() {
     expect(find.text('Tell us about yourself'), findsOneWidget);
   });
 
-  testWidgets('Wizard validates, navigates and updates requirements',
-      (tester) async {
+  testWidgets('Wizard validates, navigates and updates requirements', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
     });
-    await tester.pumpWidget(MaterialApp(
-        home: ApplyScreen(apiClient: ApiClient(client: _applyBackend()))));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ApplyScreen(apiClient: ApiClient(client: _applyBackend())),
+      ),
+    );
     await tester.pumpAndSettle();
 
     // Empty continue is blocked with a validation message.
@@ -128,22 +137,42 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
 
+    // Digits are rejected by the shared Unicode-safe person rule.
+    await tester.enterText(
+      find.widgetWithText(TextField, 'First Name *'),
+      'Juan123',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Last Name *'),
+      'Dela Cruz',
+    );
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text('Please enter a valid first name.'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+
     // Fill step 1 (personal).
     await tester.enterText(
-        find.widgetWithText(TextField, 'First Name *'), 'Juan');
+      find.widgetWithText(TextField, 'First Name *'),
+      'Juan',
+    );
     await tester.enterText(
-        find.widgetWithText(TextField, 'Last Name *'), 'Dela Cruz');
+      find.widgetWithText(TextField, 'Last Name *'),
+      'Dela Cruz',
+    );
     await tester.enterText(
-        find.widgetWithText(TextField, 'Email Address *'), 'juan.test@example.com');
+      find.widgetWithText(TextField, 'Email Address *'),
+      'juan.test@example.com',
+    );
     await tester.enterText(
-        find.widgetWithText(TextField, 'Phone Number *  (+639 / 09)'),
-        '09178881111');
+      find.widgetWithText(TextField, 'Phone Number *  (+639 / 09)'),
+      '09178881111',
+    );
     await tester.tap(find.text('Male'));
     await tester.pump();
-    await tester.enterText(
-        find.widgetWithText(TextField, 'House No.'), '123');
-    await tester.enterText(
-        find.widgetWithText(TextField, 'Street'), 'Test St');
+    await tester.enterText(find.widgetWithText(TextField, 'House No.'), '123');
+    await tester.enterText(find.widgetWithText(TextField, 'Street'), 'Test St');
     await _selectAddress(tester);
     // Date of birth via the date picker (defaults to 20 years ago).
     await tester.ensureVisible(find.text('Select date'));
@@ -170,11 +199,24 @@ void main() {
     expect(find.text('Vehicle Information'), findsOneWidget);
 
     await tester.enterText(
-        find.widgetWithText(TextField, 'License Plate *'), 'ABC1234');
+      find.widgetWithText(TextField, 'License Plate *'),
+      'ABC1234',
+    );
     await tester.enterText(
-        find.widgetWithText(TextField, 'License Number *'), 'L123456');
+      find.widgetWithText(TextField, 'License Number *'),
+      'L123456',
+    );
+    // Pick a license expiry date (future date via the date picker).
+    await tester.ensureVisible(find.text('Select date').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Select date').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
     await tester.enterText(
-        find.widgetWithText(TextField, 'Vehicle Registration *'), 'REG-1');
+      find.widgetWithText(TextField, 'Vehicle Registration *'),
+      'REG-1',
+    );
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
 

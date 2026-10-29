@@ -4,9 +4,11 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/format_utils.dart';
 import '../../providers/earnings_provider.dart';
+import '../../widgets/app_ui.dart';
 import '../../widgets/dashboard_card.dart';
 import '../../widgets/error_widget.dart';
 import '../../widgets/loading_widget.dart';
+import '../remittances/remittances_screen.dart';
 import 'history_screen.dart';
 
 /// Rider earnings dashboard (daily / weekly / monthly).
@@ -44,30 +46,47 @@ class EarningsScreen extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       children: [
         Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(AppGaps.xl),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [AppTheme.primary, AppTheme.primaryDark],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primary.withValues(alpha: 0.3),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                "Today's Earnings",
-                style: TextStyle(color: Colors.white70, fontSize: 13),
+              const Row(
+                children: [
+                  Icon(
+                    Icons.account_balance_wallet_outlined,
+                    color: Colors.white70,
+                    size: 14,
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    "Today's Earnings",
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 6),
               Text(
                 FormatUtils.peso(summary.today),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 34,
-                  fontWeight: FontWeight.w800,
-                ),
+                style: AppText.kpi(34).copyWith(color: Colors.white),
               ),
             ],
           ),
@@ -94,14 +113,31 @@ class EarningsScreen extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 16),
+        Card(
+          child: ListTile(
+            leading: const IconTile(
+              icon: Icons.account_balance_wallet_outlined,
+              size: 42,
+              iconSize: 20,
+            ),
+            title: const Text('Cash Remittances'),
+            subtitle: const Text('Cash-on-Delivery collections to hand over'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const RemittancesScreen(),
+                ),
+              );
+            },
+          ),
+        ),
         const SizedBox(height: 20),
         Row(
           children: [
             const Expanded(
-              child: Text(
-                'Last 30 Days',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-              ),
+              child: Text('Last 30 Days', style: AppText.section),
             ),
             TextButton(
               onPressed: () {
@@ -133,24 +169,20 @@ class EarningsScreen extends StatelessWidget {
             return Card(
               margin: const EdgeInsets.only(bottom: 10),
               child: ListTile(
-                leading: Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.savings_outlined,
-                      color: AppTheme.primary),
+                leading: const IconTile(
+                  icon: Icons.savings_outlined,
+                  size: 42,
+                  iconSize: 20,
                 ),
                 title: Text(
                   FormatUtils.date(day.date),
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+                  style: AppText.cardTitle.copyWith(fontSize: 14),
                 ),
                 subtitle: Text(
                   day.deliveries == 1
                       ? '1 delivery'
                       : '${day.deliveries} deliveries',
+                  style: AppText.secondary.copyWith(fontSize: 12),
                 ),
                 trailing: Text(
                   FormatUtils.peso(day.amount),

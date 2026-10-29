@@ -137,6 +137,16 @@ class DeliveryProvider extends ChangeNotifier {
         _applyUpdated(updated);
       });
 
+  Future<bool> requestReattempt(int id) => _runAction(
+        'requestReattempt',
+        () async => _applyUpdated(await _service.requestReattempt(id)),
+      );
+
+  Future<bool> returnToCenter(int id) => _runAction(
+        'returnToCenter',
+        () async => _applyUpdated(await _service.returnToCenter(id)),
+      );
+
   Future<bool> sortingCenterHandoff(int id) => _runAction(
         'sortingCenterHandoff',
         () async => _applyUpdated(await _service.sortingCenterHandoff(id)),

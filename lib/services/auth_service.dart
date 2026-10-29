@@ -31,4 +31,35 @@ class AuthService {
   Future<void> logout() async {
     await _api.post('/logout');
   }
+
+  /// Request a password reset email for a rider address.
+  ///
+  /// The backend always answers with the same generic message (even for
+  /// unknown addresses), so the returned text is safe to display as-is.
+  Future<String> requestPasswordReset({required String email}) async {
+    final data = await _api.post('/rider/password/forgot', body: {
+      'email': email,
+    });
+    final message = (data is Map ? data['message'] : null) as String?;
+    return message ??
+        'If an active rider account exists for that email address, a password reset link has been sent.';
+  }
+
+  /// Consume a reset token and set a new password. Throws [ApiException]
+  /// with the backend's generic message for invalid/expired/used tokens —
+  /// never revealing which account (if any) was involved.
+  Future<String> resetPassword({
+    required String email,
+    required String token,
+    required String newPassword,
+  }) async {
+    final data = await _api.post('/rider/password/reset', body: {
+      'email': email,
+      'token': token,
+      'password': newPassword,
+      'password_confirmation': newPassword,
+    });
+    final message = (data is Map ? data['message'] : null) as String?;
+    return message ?? 'Password reset successfully.';
+  }
 }

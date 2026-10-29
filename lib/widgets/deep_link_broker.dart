@@ -53,6 +53,7 @@ class AppDeepLinkBroker extends StatefulWidget {
 
 class _AppDeepLinkBrokerState extends State<AppDeepLinkBroker> {
   StreamSubscription<Uri>? _linksSubscription;
+  StreamSubscription<Uri>? _resetSubscription;
 
   @override
   void initState() {
@@ -62,7 +63,10 @@ class _AppDeepLinkBrokerState extends State<AppDeepLinkBroker> {
       if (service == null) return;
       final initial = await service.initialLink;
       if (mounted && initial != null) _openLogin(initial);
+      final initialReset = await service.initialResetLink;
+      if (mounted && initialReset != null) _openReset(initialReset);
       _linksSubscription = service.loginLinks.listen(_openLogin);
+      _resetSubscription = service.resetLinks.listen(_openReset);
     });
   }
 
@@ -75,9 +79,23 @@ class _AppDeepLinkBrokerState extends State<AppDeepLinkBroker> {
     widget.navKey.currentState?.pushNamed(DeepLinkService.loginRouteName);
   }
 
+  void _openReset(Uri uri) {
+    final credentials = DeepLinkService.resetCredentials(uri);
+    if (credentials == null) return;
+    if (widget.routeTracker.current?.settings.name ==
+        DeepLinkService.resetRouteName) {
+      return;
+    }
+    widget.navKey.currentState?.pushNamed(
+      DeepLinkService.resetRouteName,
+      arguments: {'email': credentials.email, 'token': credentials.token},
+    );
+  }
+
   @override
   void dispose() {
     _linksSubscription?.cancel();
+    _resetSubscription?.cancel();
     super.dispose();
   }
 

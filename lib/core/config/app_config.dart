@@ -27,7 +27,7 @@ class AppConfig {
   /// Base URL for a production Laravel deployment.
   static const String prodHost = String.fromEnvironment(
     'API_PRODUCTION_URL',
-    defaultValue: 'https://api.invoize.example/api',
+    defaultValue: 'https://api.invoize.example/api/logistics',
   );
 
   /// The resolved API base URL.
@@ -47,14 +47,14 @@ class AppConfig {
     if (_dartDefineUrl.isNotEmpty) return _dartDefineUrl;
 
     // 3. Platform defaults
-    if (kIsWeb) return 'http://localhost:8000/api';
+    if (kIsWeb) return 'http://localhost:8000/api/logistics';
     if (Platform.isAndroid) {
       return environment == 'production'
           ? prodHost
-          : 'http://10.0.2.2:8000/api';
+          : 'http://10.0.2.2:8000/api/logistics';
     }
     return environment == 'production'
         ? prodHost
-        : 'http://localhost:8000/api';
+        : 'http://localhost:8000/api/logistics';
   }
 }
